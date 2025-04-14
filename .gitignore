@@ -1,3 +1,10 @@
+# full data
+# full swisslipids data (lipids.tsv) should be downloaded from https://www.swisslipids.org/#/downloads
+data/lipids.tsv
+
+# results
+results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
