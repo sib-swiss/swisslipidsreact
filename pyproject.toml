@@ -1,53 +1,34 @@
 [project]
-name = "swisslipidreact"
-version = "0.0.0"
-authors = [
-  { name="Anastasia Sveshnikova", email="anastasia.sveshnikova@sib.swiss" },
-]
-description = "Package to enumerate reactions based on RheaDB and SwissLipids"
+name = "swisslipidsreact"
+version = "0.1.0"
+description = "SwissLipids Reaction Enumeration Pipeline"
 readme = "README.md"
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Operating System :: POSIX :: Linux",
-    # "Operating System :: OS Independent",
+requires-python = ">=3.9"
+authors = [
+    { name="Your Name", email="your@email.com" }
 ]
+license = { text = "MIT" }
 dependencies = [
-    "setuptools", "pandas", "rdkit",
-    "networkx", "tqdm", "matplotlib",
-    "pathlib", "pyrheadb"
+    "pandas>=1.5",
+    "networkx>=2.8",
+    "tqdm",
+    "pyrheadb", 
+    "platformdirs",
 ]
 
-[project.optional-dependencies]
-test = [
-    "pytest >=7.1.3",
-    "pytest-cov >=3.0.0",
-    "mypy >=1.4.1",
-]
-
-[project.urls]
-Homepage = "https://github.com/anasves/swisslipidreact"
-Issues = "https://github.com/anasves/swisslipidreact/issues"
-
+[project.scripts]
+swisslipidsreact = "swisslipidsreact.cli:main"
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["swisslipidreact"]
-include-package-data = true
 
+[tool.setuptools.packages.find]
+where = ["src"]
 
-[tool.pytest.ini_options]
-addopts = [
-    "--cov=src",
-    "--color=yes",
-    "--cov-report=term-missing",
-]
+[tool.setuptools.package-data]
+# explicitly include your data files
+"swisslipidsreact.package_data" = ["*.tsv", "*.csv"]

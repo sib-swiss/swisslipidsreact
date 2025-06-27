@@ -1,0 +1,13 @@
+# swiss lipids * chebi	4286
+Class reaction Rhea IDs without polymers (lipid + non-lipid)	1393
+# swiss lipids * chebi * rhea	3084
+isomeric subspecies descendants of lipids * Rhea	809236
+unique Lipid ID isomeric subspecies descendants of lipids in Rhea	561561
+Total biologically human-relevant descendants of the class lipids identified in SwissLipids	196
+Rhea_x_swisslipid_isomeric_subspecies	1972
+Unique_swisslipid_isomeric_subspecies_in_Rhea	183
+Total MASTER_IDs with at least one SwissLipid descendant	872
+Total MASTER_IDs with SwissLipid in reactants and products of reaction	566
+num_reactions_to_check_for_balance	13625
+num_reactions_after_filtering_out_the_unbalanced	857
+Master IDs after balance	532
