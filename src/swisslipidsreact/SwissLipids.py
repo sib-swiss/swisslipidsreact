@@ -426,4 +426,3 @@ class SwissLipids():
         # Filter isomeric subspecies
         isomeric_subspecies = self.swisslipids[self.swisslipids['Level'] == 'Isomeric subspecies']
         self.df_isomeric_subspecies = isomeric_subspecies.copy()
-
