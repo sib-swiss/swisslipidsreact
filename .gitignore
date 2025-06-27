@@ -178,3 +178,4 @@ cython_debug/
 
 # MAC OS
 *.DS_Store
+src/swisslipidsreact/package_data/lipids.tsv
