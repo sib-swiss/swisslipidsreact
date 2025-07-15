@@ -204,33 +204,46 @@ class RheaToSwisslipidsDf():
         MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced = len(set(result_df['MASTER_ID']))
         num_reactions_to_check_for_balance = len(result_df) #print('Total # of reactions to check for balance:', len(result_df))
 
-        SLM_RE = re.compile(r'(SLM:\d+)\s*\(([^)]+)\)')
+        def extract_position_map(eq_side: str) -> dict[str, str]:
+            """
+            Given one side of the component equation (left or right), return {position: SLM}.
+            Uses the same parsing logic from the extractall + explode + pivot code.
+            """
+            # pattern like "SLM:000000123 (sn1 or sn2)"
+            pattern = r'(SLM:\d+)\s+\(([^)]+)\)'
+            matches = re.findall(pattern, eq_side)
 
-        def _extract_pos_side(side: str) -> dict[str, str]:
-            """Extract a dict {position: SLM} from one side of the equation, skipping non-lipids."""
+            extracted_rows = []
+            for slm, pos_string in matches:
+                positions_split = re.split(r'\s*(?:or|and|,)\s*', pos_string)
+                for pos in positions_split:
+                    pos = pos.strip()
+                    if pos in positions:
+                        extracted_rows.append((pos, slm))
+
+            # Keep only one SLM per position
             pos_map = {}
-            for comp, pos in SLM_RE.findall(side):
-                pos_map[pos] = comp
+            for pos, slm in extracted_rows:
+                if pos not in pos_map:  # take first one only
+                    pos_map[pos] = slm
             return pos_map
 
         def summarise(eq: str):
-            """For a given equation string, return a dict with position summaries and change flags.
-            -> dict[str, str | bool]"""
+            """For a given equation string, return a dict with position summaries and change flags."""
             left, right = eq.split('=', 1)
-            left_map = _extract_pos_side(left)
-            right_map = _extract_pos_side(right)
+            left_map = extract_position_map(left)
+            right_map = extract_position_map(right)
 
             out = {}
             for p in positions:
                 start = left_map.get(p)
-                end   = right_map.get(p)
+                end = right_map.get(p)
 
                 if start is None and end is None:
                     out[p] = ''
                     out[f'{p}_change'] = False
                 else:
                     out[p] = f'{start or "None"}-{end or "None"}'
-                    # only count as change if both sides are filled and differ
                     out[f'{p}_change'] = (start is not None and end is not None and start != end)
             return out
 
