@@ -1,8 +1,6 @@
 import pandas as pd
 import os
 import networkx as nx
-import numpy as np
-import os
 import importlib.resources
 from platformdirs import user_cache_dir
 
@@ -383,7 +381,7 @@ class SwissLipids():
         final_df = pd.concat(df_slices, ignore_index=True) if df_slices else pd.DataFrame()
 
         return final_df
-      
+    
     # ---------- Lipid Class Graph Analysis ----------
     def get_lipid_to_descendant_df(self, parent_SLMs):
 

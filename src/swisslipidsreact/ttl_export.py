@@ -2,7 +2,6 @@ def export_ttl(full_scope=True, input_path=None, output_dir=None):
     from rdflib import Graph, Namespace, RDF, RDFS, URIRef, Literal
     import pandas as pd
     import os
-    import re
     from datetime import datetime
     import glob
     

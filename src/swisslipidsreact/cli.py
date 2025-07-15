@@ -11,7 +11,7 @@ def main():
     parser_run.add_argument(
         "--curated-fa",
         action="store_true",
-        help="Use curated fatty acid list (default: False)"
+        help="Use curated fatty acid list (default: False for C16)"
     )
     parser_run.add_argument(
         "--output-dir",
@@ -19,7 +19,18 @@ def main():
         default=None,
         help="Output directory (default: current working directory)"
     )
-
+    parser_run.add_argument(
+        "--rheaid",
+        type=int,
+        default=None,
+        help="run pipeline for only one rhea id"
+    )
+    parser_run.add_argument(
+        "--all-fa",
+        action="store_true",
+        default=False,
+        help="No restrictions of FA per position"
+    )
     # ttl export command
     parser_export = subparsers.add_parser("export-ttl", help="Export RDF Turtle file from results")
     parser_export.add_argument(
@@ -41,12 +52,15 @@ def main():
         help="Output directory (default: current working directory)"
     )
 
+
     args = parser.parse_args()
 
     if args.command == "run":
         run_pipeline(
             curated_fa_list_run=args.curated_fa,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            no_curated_list_restrictions=args.all_fa,
+            rheaid=args.rheaid
         )
     elif args.command == "export-ttl":
         export_ttl(

@@ -7,7 +7,7 @@ from pyrheadb.RheaDB import RheaDB
 from .SwissLipids import SwissLipids
 from .RheaToSwisslipidsDf import RheaToSwisslipidsDf
 
-def run_pipeline(curated_fa_list_run=True, output_dir=None):
+def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_restrictions=True, rheaid=None):
     from datetime import datetime
 
     # determine the base directory
@@ -37,6 +37,8 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None):
 
     rdb = RheaDB()
     rheadf = rdb.rhea_reaction_long_format_smiles_chebi
+    if rheaid:
+        rheadf = rheadf[rheadf['MASTER_ID']==rheaid]
     rhea_reactions = rdb.df_reactions
 
     rhea_non_residue_reactions = rhea_reactions[rhea_reactions['residue_rxn_flag']==False]
@@ -119,8 +121,12 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None):
     summary_lines.append(f'unique Lipid ID isomeric subspecies descendants of lipids in Rhea\t{len(set(rhea_lipid_to_descendant_df["isomeric_subspecies_descendant_lipid_id"]))}')
 
     # next df uses pos_descr_to_FA_list ->
-    class_lipid_to_descendants_df = sl.filter_curated_biologically_relevant_isomeric_subspecies_only(curated_fa_list_run=curated_fa_list_run)
-    summary_lines.append(f'Total biologically human-relevant descendants of the class lipids identified in SwissLipids\t{len(class_lipid_to_descendants_df)}')
+    if no_curated_list_restrictions == False:
+        class_lipid_to_descendants_df = sl.filter_curated_biologically_relevant_isomeric_subspecies_only(curated_fa_list_run=curated_fa_list_run)
+        summary_lines.append(f'Total biologically human-relevant descendants of the class lipids identified in SwissLipids\t{len(class_lipid_to_descendants_df)}')
+    elif no_curated_list_restrictions == True:
+        class_lipid_to_descendants_df = rhea_lipid_to_descendant_df
+    
     rhea_lipid_to_descendant_df_temp = rhea_lipid_to_descendant_df[rhea_lipid_to_descendant_df['Lipid ID'].isin(class_lipid_to_descendants_df['Lipid ID'])]
 
     Rhea_x_swisslipid_isomeric_subspecies, \
