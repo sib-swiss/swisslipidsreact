@@ -18,6 +18,16 @@ swisslipidsreact run --output-dir results_C16/
 swisslipidsreact run --curated-fa --output-dir results_curated_fatty_acids/
 ```
 
+* run pipeline for all fatty acids (execution time: ∞):
+```bash
+swisslipidsreact run --all-fa --output-dir results_all_fatty_acids/
+```
+
+* run pipeline for all fatty acids per rhea id (execution time: ∞):
+```bash
+swisslipidsreact run --all-fa --output-dir results_78071/ --rheaid 78071
+```
+
 * turtle (RDF type) export for palmitate:
 ```bash
 swisslipidsreact export-ttl --output-dir results_C16/
