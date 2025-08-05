@@ -1,3 +1,13 @@
+## Description
+This code combines [Rhea](https://www.rhea-db.org) database of biochemical reactiona and [SwissLipids](https://www.swisslipids.org/#/) database of lipid structures to enumerate the hypothetically possible space of biochemical reactions with lipid structures fully resolved.
+
+The subset of Rhea reactions that define the lipid reaction mechanisms are represented using [ChEBI](https://www.ebi.ac.uk/chebi/) idenitfiers of reacting lipid classes in the Rhea database.
+
+SwissLipids provides connection between the lipid class - hypothetical entity aiming to represent many lipids present in nature that share a particular substructure - and all of the hypothetically possible lipid structures with isomeric subspecies level of compound structure definition, i.e. 2.5D structure definition, allowing to recognise precisely atom composition and bond order, as well as stereochemical tags of the atoms of every molecule.
+
+This code transforms each Rhea reaction defined in terms of lipid classes into a set of reactions with each reactant and product having their 2.5D structures defined, and checks the correspondance between reactant and products to ensure that the resulting reactions are atomically balanced and biochemically feasible.
+
+## Data
 It is necessary to download lipids.tsv from [SwissLipids](https://www.swisslipids.org/#/downloads).
 
 lipids.tsv (~700MB) should be located in src/swisslipidsreact/package_data before starting the execution.
@@ -6,6 +16,11 @@ lipids.tsv (~700MB) should be located in src/swisslipidsreact/package_data befor
 ```bash
 pip install .
 ```
+
+## pyrheadb dependency
+This package is dependent on [pyrheadb](https://github.com/sib-swiss/pyrheadb/tree/main).
+
+To avoid downloading and preprocessing full Rhea reaction data for every potential new execution, follow [instructions](https://github.com/sib-swiss/pyrheadb/wiki) on how to set up the RHEADB_LOC environment variable.
 
 ## Usage
 By default, the pipeline will generate results for palmitate only.
