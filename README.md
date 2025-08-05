@@ -37,7 +37,7 @@ swisslipidsreact export-ttl
 Option | Meaning | Time | Usage |
 --- | --- | --- | --- |
 Curated FA | Filter SwissLipids based on allowed FA per position | hours | considered full enumerated set |
-Palmitate only | Only palmitate allowed as a fatty acid in any position | minutes | test set, control execution and output |
+Palmitate only | Only palmitate allowed as a fatty acid in any position | minutes | default, C16, test set, control execution and output |
 All FA  | all SwissLipids considered | ∞ | not recommended for all Rhea IDs, can be used for individual Rhea ID |
 
 ```bash
