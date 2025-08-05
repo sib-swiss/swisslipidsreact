@@ -5,7 +5,7 @@ description = "SwissLipids Reaction Enumeration Pipeline"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [
-    { name="Your Name", email="your@email.com" }
+    { name="Anastasia Sveshnikova", email="sveshnikova.ana@gmail.com" }
 ]
 license = { text = "MIT" }
 dependencies = [
@@ -30,5 +30,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-# explicitly include your data files
-"swisslipidsreact.package_data" = ["*.tsv", "*.csv"]
+"swisslipidsreact.package_data" = [
+    "*.tsv", "*.csv",
+    "components_correction/*.tsv", "components_correction/*.csv"
+]
