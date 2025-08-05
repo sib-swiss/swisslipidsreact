@@ -22,6 +22,59 @@ This package is dependent on [pyrheadb](https://github.com/sib-swiss/pyrheadb/tr
 
 To avoid downloading and preprocessing full Rhea reaction data for every potential new execution, follow [instructions](https://github.com/sib-swiss/pyrheadb/wiki) on how to set up the RHEADB_LOC environment variable.
 
+## Run
+```bash
+# Run enumeration
+swisslipidsreact run
+
+# Export .ttl (turtle) format for integration into the RDF knowledge graph.
+swisslipidsreact export-ttl
+```
+## Options
+
+* Fatty acid options
+  
+Option | Meaning | Time | Usage |
+--- | --- | --- | --- |
+Curated FA | Filter SwissLipids based on allowed FA per position | hours | considered full enumerated set |
+Palmitate only | Only palmitate allowed as a fatty acid in any position | minutes | test set, control execution and output |
+All FA  | all SwissLipids considered | ∞ | not recommended for all Rhea IDs, can be used for individual Rhea ID |
+
+```bash
+# run options
+
+"--output-dir",
+type=str,
+default=None,
+help="Output directory (default: current working directory)"
+
+"--curated-fa",
+action="store_true",
+help="Use curated fatty acid list (default: False for C16)"
+
+"--all-fa",
+action="store_true",
+default=False,
+help="No restrictions of FA per position"
+
+"--rheaid",
+type=int,
+default=None,
+help="run pipeline for only one rhea id"
+
+# ttl export options
+
+"--curated-fa",
+action="store_true",
+help="Use curated fatty acid list for TTL export (default: False for C16)"
+
+"--input",
+type=str,
+default=None,
+help="Input TSV file (default: inferred from mode)"
+
+```
+
 ## Usage
 By default, the pipeline will generate results for palmitate only.
 To generate results for the whole list of fatty acids in human and enumerated classes, set --curated-fa option.
