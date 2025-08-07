@@ -1,6 +1,7 @@
 import pandas as pd
 import glob
 import os
+from datetime import datetime
 
 from pyrheadb.RheaDB import RheaDB
 
@@ -8,7 +9,6 @@ from .SwissLipids import SwissLipids
 from .RheaToSwisslipidsDf import RheaToSwisslipidsDf
 
 def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_restrictions=True, rheaid=None):
-    from datetime import datetime
 
     # determine the base directory
     if output_dir is None:
@@ -18,7 +18,6 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
 
     # generate a timestamped filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
     summary_results_file = f'{timestamp}_summary_results.tsv'
 
     # ---------- Load and Process RheaDB Data ----------
@@ -122,8 +121,10 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
 
     # next df uses pos_descr_to_FA_list ->
     if no_curated_list_restrictions == False:
-        class_lipid_to_descendants_df = sl.filter_curated_biologically_relevant_isomeric_subspecies_only(curated_fa_list_run=curated_fa_list_run)
+        class_lipid_to_descendants_df, all_lipids_considered = sl.filter_curated_biologically_relevant_isomeric_subspecies_only(curated_fa_list_run=curated_fa_list_run)
         summary_lines.append(f'Total biologically human-relevant descendants of the class lipids identified in SwissLipids\t{len(class_lipid_to_descendants_df)}')
+        rhea_lipid_to_descendant_df_not_filtered=rhea_lipid_to_descendant_df[~rhea_lipid_to_descendant_df['Lipid ID'].isin(all_lipids_considered)]
+        class_lipid_to_descendants_df = pd.concat([class_lipid_to_descendants_df, rhea_lipid_to_descendant_df_not_filtered]) # adding those lipids that were not in the list with positions
     elif no_curated_list_restrictions == True:
         class_lipid_to_descendants_df = rhea_lipid_to_descendant_df
     
@@ -133,15 +134,14 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
         Unique_swisslipid_isomeric_subspecies_in_Rhea, \
             = r2sl.get_df_rhea_descendant(rhea_lipid_to_descendant_df_temp, sl.swisslipids)
 
-    rhea_reactions['4_after_getting_df_descendants'] = rhea_reactions['MASTER_ID'].isin(r2sl.df['MASTER_ID'])
-
-    r2sl.df.dropna(subset=['Components*'], inplace=True)
+    rhea_reactions['4_after_getting_df_descendants'] = rhea_reactions['MASTER_ID'].isin(r2sl.df_rhea_descendant['MASTER_ID'])
 
     # Function save_results generated the combinations and saves the results
-    total_gen_attempted, MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced, \
+    total_gen_attempted, \
+    MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced, \
     num_reactions_to_check_for_balance, \
     MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced, \
-    num_reactions_after_filtering_out_the_unbalanced = r2sl.save_results(rheadf, r2sl.df, rhea_reactions, f'{timestamp}_enumerated_reactions.tsv')
+    num_reactions_after_filtering_out_the_unbalanced = r2sl.save_results(rheadf, r2sl.df_rhea_descendant, rhea_reactions, f'{timestamp}_enumerated_reactions.tsv')
 
     stats_dict = {
         'Rhea_x_swisslipid_isomeric_subspecies':  Rhea_x_swisslipid_isomeric_subspecies, 

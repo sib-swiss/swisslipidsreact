@@ -324,6 +324,7 @@ class SwissLipids():
         df_slices = []
 
         res_filtering = []
+        all_lipids_considered = []
         # Main filtering loop
         for chebiid, sn_to_descr in chebi_class_to_sn_positions.items():
             # Here I introduced the flag for degugging to make sure that a certain chebi is 
@@ -340,6 +341,7 @@ class SwissLipids():
                 continue
 
             df_desc = self.get_lipid_to_descendant_df(SLM_classes)
+            all_lipids_considered.extend(df_desc['Lipid ID'].to_list())
             if flag_print == True:
                 print('descendants before filtering', len(df_desc))
                 df_desc.to_csv('test.tsv', sep='\t',index=False)
@@ -380,7 +382,7 @@ class SwissLipids():
         # Combine all results
         final_df = pd.concat(df_slices, ignore_index=True) if df_slices else pd.DataFrame()
 
-        return final_df
+        return final_df, all_lipids_considered
     
     # ---------- Lipid Class Graph Analysis ----------
     def get_lipid_to_descendant_df(self, parent_SLMs):
