@@ -115,15 +115,16 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
 
     rhea_reactions['rxnsmiles_I'] = rhea_reactions['rxnsmiles'].apply(lambda x: x.replace('[1*]','C').replace('At','C').replace('[2*]','C').replace('*','C'))
 
-    # def get_attention_guided_atom_map_error_wrap(mapped_rxn):
-    #     try:
-    #         return r2sl.rxn_mapper.get_attention_guided_atom_maps([mapped_rxn])[0]['mapped_rxn']
-    #     except:
-    #         return '[C:1]>>[C:1]'
-    # rhea_reactions['rxnsmiles_I_mapped'] = rhea_reactions['rxnsmiles_I'].progress_apply(lambda x: get_attention_guided_atom_map_error_wrap(x))
-    # rhea_reactions['bond_changes'] = rhea_reactions['rxnsmiles_I_mapped'].progress_apply(lambda x: len(r2sl.mapped_reaction_to_report(x)['bond_changes']))
-    # rhea_reactions.to_csv('rhea_reactions_bond_changes.tsv', sep='\t', index=False)
-    # exit()
+    def get_attention_guided_atom_map_error_wrap(mapped_rxn):
+        try:
+            return r2sl.rxn_mapper.get_attention_guided_atom_maps([mapped_rxn])[0]['mapped_rxn']
+        except:
+            return '[C:1]>>[C:1]' # return dummy atom mapped equation that will return 0 bond changes
+
+    if not os.path.exists('rhea_reactions_bond_changes.tsv'):
+        rhea_reactions['rxnsmiles_I_mapped'] = rhea_reactions['rxnsmiles_I'].progress_apply(lambda x: get_attention_guided_atom_map_error_wrap(x))
+        rhea_reactions['bond_changes'] = rhea_reactions['rxnsmiles_I_mapped'].progress_apply(lambda x: len(r2sl.mapped_reaction_to_report(x)['bond_changes']))
+        rhea_reactions.to_csv('rhea_reactions_bond_changes.tsv', sep='\t', index=False)
 
     df_bc = pd.read_csv('rhea_reactions_bond_changes.tsv', sep='\t')
     bond_changes_lookup = dict(zip(df_bc['MASTER_ID'], df_bc['bond_changes']))
