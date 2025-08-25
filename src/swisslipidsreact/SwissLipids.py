@@ -188,7 +188,7 @@ class SwissLipids():
         # your cache file path
         cache_file = os.path.join(self.cache_dir, "lipids_preprocessed.tsv")
         self.swisslipids.to_csv(cache_file, sep="\t", index=False)
-
+    
     # ---------- Load SwissLipids Data ----------
     def read_swisslipids_from_file(self):
 
@@ -207,6 +207,14 @@ class SwissLipids():
             self.swisslipids.loc[~self.swisslipids['SMILES (pH7.3)'].isna() & 
             self.swisslipids['Level'].isna() & ~self.swisslipids['SMILES (pH7.3)'].str.contains('*', regex=False, na=False),
             'Level'] = 'Isomeric subspecies'
+
+            # malonyl-CoA(5−)	CHEBI:57384
+            # acetyl-CoA(4−)	CHEBI:57288
+            # glycerone phosphate(2−)	CHEBI:57642
+            # (S)-methylmalonyl-CoA(5−)	CHEBI:57327
+            # acetoacetate	CHEBI:13705
+            # dicarboxylic acid dianion CHEBI:28965
+            self.swisslipids=self.swisslipids[~self.swisslipids['CHEBI'].isin(['57384', '57288', '57642', '57327', '13705', '28965'])]
 
             print('splitting the components into the positions')
             # Define possible positions

@@ -28,6 +28,7 @@ signal.signal(signal.SIGALRM, handler)
 class RheaToSwisslipidsDf():
     
     def __init__(self, output_dir='', timestamp='now'):
+        self.rxn_mapper = RXNMapper()
         self.output_dir=output_dir
         self.timestamp=timestamp
 
@@ -235,7 +236,10 @@ class RheaToSwisslipidsDf():
         }
             return report
         mapped_rxn = result['mapped_rxn']
+        report = self.mapped_reaction_to_report(mapped_rxn)
+        return report
 
+    def mapped_reaction_to_report(self, mapped_rxn):
         reactant_smiles, product_smiles = mapped_rxn.split(">>")
         reactants = [Chem.MolFromSmiles(s) for s in reactant_smiles.split(".")]
         products  = [Chem.MolFromSmiles(s) for s in product_smiles.split(".")]
@@ -283,13 +287,13 @@ class RheaToSwisslipidsDf():
 
     # ---------- Generate, Filter, and Save Final Results ----------
 
-    def check_reactions_for_which_component_matching_was_impossible_with_atom_mapper(self, row):
+    def check_reactions_for_which_component_matching_was_impossible_with_atom_mapper(self, row, bond_changes_lookup):
         if row['component_match']=='no_component_match':
             discrepancies = self.summarize_discrepancies(row['reaction_smiles'])
-            return len(discrepancies['bond_changes'])<5
+            return len(discrepancies['bond_changes'])<=bond_changes_lookup[row['MASTER_ID']]
         return True
 
-    def save_results(self, rheadf, df, rhea_reactions, filename):
+    def save_results(self, rheadf, df, rhea_reactions, filename, bond_changes_lookup):
 
         df_rhea_cut = rheadf[['MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'smiles']]
         df_rhea_cut = df_rhea_cut[df_rhea_cut['MASTER_ID'].isin(df['MASTER_ID'])]
@@ -358,7 +362,13 @@ class RheaToSwisslipidsDf():
         # df_changed.drop_duplicates(subset=['MASTER_ID'],inplace=True)
         # df_changed.to_csv('changes_examples.tsv', sep='\t', index=False)
 
+        df_change_of_sn_by_design = result_df[result_df['MASTER_ID'].isin([63596, 78043, 77759, 78435])]
+        # 63596, 78043, 77759, 78435 have triglyceride twice in reactants, therefore sn1 is not unique, 
+        # there is sn1 of the first tryglyceride, and sn2 of the second, which makes the code confused
+        df_change_of_sn_by_design['component_match']='no_component_match'
+
         result_df = result_df[~result_df[change_cols].any(axis=1)]
+        result_df = pd.concat([result_df, df_change_of_sn_by_design])
 
         rhea_reactions['7_after_dropping_incorrect_component_matches'] = rhea_reactions['MASTER_ID'].isin(result_df['MASTER_ID'])
 
@@ -371,10 +381,9 @@ class RheaToSwisslipidsDf():
         MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced = len(set(result_df['MASTER_ID']))
         rhea_reactions['8_after_dropping_unbalanced_reactions'] = rhea_reactions['MASTER_ID'].isin(result_df['MASTER_ID'])
         num_reactions_after_filtering_out_the_unbalanced = len(result_df)
-        self.rxn_mapper = RXNMapper()
-        print('Check that less than 5 bonds are broken at the same time')
-        result_df['bond_breakage_less_than_5'] = result_df.progress_apply(self.check_reactions_for_which_component_matching_was_impossible_with_atom_mapper, axis=1)
-        result_df = result_df[result_df['bond_breakage_less_than_5']==True]
+        print('Check that correct number of bonds are broken/formed at the same time')
+        result_df['bond_breakage_max_4'] = result_df.progress_apply(self.check_reactions_for_which_component_matching_was_impossible_with_atom_mapper, axis=1, args=[bond_changes_lookup,])
+        result_df = result_df[result_df['bond_breakage_max_4']==True]
         rhea_reactions.to_csv(os.path.join(self.output_dir, f'{self.timestamp}_rhea_reactions_overview.tsv'), sep='\t', index=False)
 
         # Generate RInChI and Web-RInChIKey
@@ -386,12 +395,12 @@ class RheaToSwisslipidsDf():
                 axis=1, result_type='expand'
             )
         
-        # Clean the data of the reactions withour Web-RInChIKey (without structures) and dulpicates
-        result_df.dropna(subset=['Web-RInChIKey'], inplace=True)
-        result_df.drop_duplicates(subset=['MASTER_ID', 'Web-RInChIKey', 'reaction_smiles'], inplace=True)
-        
-        # Save final result
-        result_df.to_csv(os.path.join(self.output_dir, filename), sep='\t', index=False)
+            # Clean the data of the reactions withour Web-RInChIKey (without structures) and dulpicates
+            result_df.dropna(subset=['Web-RInChIKey'], inplace=True)
+            result_df.drop_duplicates(subset=['MASTER_ID', 'Web-RInChIKey', 'reaction_smiles'], inplace=True)
+            
+            # Save final result
+            result_df.to_csv(os.path.join(self.output_dir, filename), sep='\t', index=False)
 
         return total_gen_attempted, \
               MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced, \

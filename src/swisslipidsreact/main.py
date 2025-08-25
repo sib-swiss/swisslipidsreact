@@ -113,6 +113,21 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
 
     rhea_reactions['3_keeping_only_reactions_with_swisslipids'] = rhea_reactions['MASTER_ID'].isin(MASTER_IDs)
 
+    rhea_reactions['rxnsmiles_I'] = rhea_reactions['rxnsmiles'].apply(lambda x: x.replace('[1*]','C').replace('At','C').replace('[2*]','C').replace('*','C'))
+
+    # def get_attention_guided_atom_map_error_wrap(mapped_rxn):
+    #     try:
+    #         return r2sl.rxn_mapper.get_attention_guided_atom_maps([mapped_rxn])[0]['mapped_rxn']
+    #     except:
+    #         return '[C:1]>>[C:1]'
+    # rhea_reactions['rxnsmiles_I_mapped'] = rhea_reactions['rxnsmiles_I'].progress_apply(lambda x: get_attention_guided_atom_map_error_wrap(x))
+    # rhea_reactions['bond_changes'] = rhea_reactions['rxnsmiles_I_mapped'].progress_apply(lambda x: len(r2sl.mapped_reaction_to_report(x)['bond_changes']))
+    # rhea_reactions.to_csv('rhea_reactions_bond_changes.tsv', sep='\t', index=False)
+    # exit()
+
+    df_bc = pd.read_csv('rhea_reactions_bond_changes.tsv', sep='\t')
+    bond_changes_lookup = dict(zip(df_bc['MASTER_ID'], df_bc['bond_changes']))
+
     # Analyse the directed graph of SwissLipid ontology and get all isomeric subspecies per SLM in Rhea
     rhea_lipid_to_descendant_df = sl.get_lipid_to_descendant_df(SLMs_in_rhea)
     summary_lines.append(f'# swiss lipids * chebi * rhea\t{len(r2sl.df_swiss_lipids_chebi_rhea)}')
@@ -141,7 +156,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced, \
     num_reactions_to_check_for_balance, \
     MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced, \
-    num_reactions_after_filtering_out_the_unbalanced = r2sl.save_results(rheadf, r2sl.df_rhea_descendant, rhea_reactions, f'{timestamp}_enumerated_reactions.tsv')
+    num_reactions_after_filtering_out_the_unbalanced = r2sl.save_results(rheadf, r2sl.df_rhea_descendant, rhea_reactions, f'{timestamp}_enumerated_reactions.tsv', bond_changes_lookup)
 
     stats_dict = {
         'Rhea_x_swisslipid_isomeric_subspecies':  Rhea_x_swisslipid_isomeric_subspecies, 

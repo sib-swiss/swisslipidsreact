@@ -1,7 +1,7 @@
 import argparse
-from swisslipidsreact.main import run_pipeline
-from swisslipidsreact.ttl_export import export_ttl
-from swisslipidsreact.MasterIdAnalysis import MasterIdAnalysis
+from .main import run_pipeline
+from .ttl_export import export_ttl
+from .MasterIdAnalysis import MasterIdAnalysis
 
 def main():
     parser = argparse.ArgumentParser(description="SwissLipids Reaction Pipeline")
