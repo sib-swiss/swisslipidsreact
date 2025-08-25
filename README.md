@@ -1,3 +1,12 @@
+# SwissLipidsReact
+
+Expands Rhea reaction patterns into complete lipid reactions, resolving structures and assigning RInChIs.
+
+[![License](https://img.shields.io/github/license/sib-swiss/pyrheadb)](LICENSE)
+![OS Linux](https://img.shields.io/badge/OS-Linux-green)
+![OS Windows](https://img.shields.io/badge/OS-Windows-blue)
+![OS macOS](https://img.shields.io/badge/OS-macOS-lightgrey)
+
 ## Description
 This code combines [Rhea](https://www.rhea-db.org) database of biochemical reactiona and [SwissLipids](https://www.swisslipids.org/#/) database of lipid structures to enumerate the hypothetically possible space of biochemical reactions with lipid structures fully resolved.
 
@@ -29,6 +38,9 @@ swisslipidsreact run
 
 # Export .ttl (turtle) format for integration into the RDF knowledge graph.
 swisslipidsreact export-ttl
+
+# rhea reaction template usage analysis
+swisslipidsreact master-id-analysis
 ```
 ## Options
 
@@ -108,4 +120,9 @@ swisslipidsreact export-ttl --output-dir results_C16/
 * turtle (RDF type) export for curated list of fatty acids (execution time: several hours):
 ```bash
 swisslipidsreact export-ttl --curated-fa --output-dir results_curated_fatty_acids/
+```
+
+* analyse the rhea reaction master id usage
+```bash
+swisslipidsreact master-id-analysis --input "results_merged/merged_enumerated_reactions.tsv" --all-fa
 ```

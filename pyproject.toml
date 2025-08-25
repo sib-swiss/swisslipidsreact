@@ -8,6 +8,7 @@ authors = [
     { name="Anastasia Sveshnikova", email="sveshnikova.ana@gmail.com" }
 ]
 license = { text = "MIT" }
+
 dependencies = [
     "pandas>=1.5",
     "networkx>=2.8",
