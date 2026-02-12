@@ -1,4 +1,4 @@
-def export_ttl(full_scope=True, input_path=None, output_dir=None):
+def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format='ttl'):
     from rdflib import Graph, Namespace, RDF, RDFS, URIRef, Literal
     import pandas as pd
     import os
@@ -37,7 +37,7 @@ def export_ttl(full_scope=True, input_path=None, output_dir=None):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(
         output_dir,
-        f"reactions_{'curated_FA' if full_scope else 'PAL_C16'}_{timestamp}.ttl"
+        f"reactions_{'curated_FA' if full_scope else 'PAL_C16'}_{timestamp}.{output_format}"
     )
 
     # load dataframe
@@ -128,4 +128,4 @@ def export_ttl(full_scope=True, input_path=None, output_dir=None):
             accessions_ready.append(accession)
 
     print(f"Saving RDF with {len(g)} triples to: {output_file}")
-    g.serialize(destination=output_file, format="ttl")
+    g.serialize(destination=output_file, format=output_format, encoding='utf-8')

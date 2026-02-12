@@ -52,6 +52,12 @@ def main():
         default=None,
         help="Output directory (default: current working directory)"
     )
+    parser_export.add_argument(
+        "--output-format",
+        type=str,
+        default="ttl",
+        help="RDF output format for exporting"
+    )
 
     parser_master_id_analysis = subparsers.add_parser("master-id-analysis", help="Export RDF Turtle file from results")
     parser_master_id_analysis.add_argument(
@@ -90,7 +96,8 @@ def main():
         export_ttl(
             full_scope=args.curated_fa,
             input_path=args.input,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            output_format=args.output_format
         )
 
     elif args.command == "master-id-analysis":

@@ -126,3 +126,11 @@ swisslipidsreact export-ttl --curated-fa --output-dir results_curated_fatty_acid
 ```bash
 swisslipidsreact master-id-analysis --input "results_merged/merged_enumerated_reactions.tsv" --all-fa
 ```
+
+
+## Profiling
+
+```bash
+pip install pyinstrument
+pyinstrument --from-path swisslipidsreact export-ttl -input ... --output-dir ...
+```
