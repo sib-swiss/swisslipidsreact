@@ -33,7 +33,7 @@ def main():
         help="No restrictions of FA per position"
     )
     # ttl export command
-    parser_export = subparsers.add_parser("export-ttl", help="Export RDF Turtle file from results")
+    parser_export = subparsers.add_parser("export-ttl", help="Export RDF file from results")
     parser_export.add_argument(
         "--curated-fa",
         action="store_true",
@@ -56,10 +56,10 @@ def main():
         "--output-format",
         type=str,
         default="ttl",
-        help="RDF output format for exporting"
+        help="RDF output format for exporting (nt, ttl etc.)"
     )
 
-    parser_master_id_analysis = subparsers.add_parser("master-id-analysis", help="Export RDF Turtle file from results")
+    parser_master_id_analysis = subparsers.add_parser("master-id-analysis", help="Master id analysis")
     parser_master_id_analysis.add_argument(
         "--input",
         type=str,

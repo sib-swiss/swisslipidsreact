@@ -1,4 +1,4 @@
-def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format='ttl'):
+def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format='nt'):
     from rdflib import Graph, Namespace, RDF, RDFS, URIRef, Literal
     import pandas as pd
     import os
