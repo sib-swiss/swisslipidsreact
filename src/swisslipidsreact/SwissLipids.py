@@ -1,27 +1,32 @@
+import logging
 import pandas as pd
 import os
 import networkx as nx
 import importlib.resources
 from platformdirs import user_cache_dir
 
+from .utils import DEBUG, debug_df_first_row
 from .FA_lists import positions, get_FA_list, FAS_15, FAS_85, FAS_79, FOH_15, PAL_C16, PALOH_C16, PAL_C16_OCT_C18, SPHINGO_23
+
+logger = logging.getLogger(__name__)
 
 flag_fast_exec = True
 
 class SwissLipids():
 
     def __init__(self, output_dir='', timestamp='now'):
-        # get a safe cache directory
+        # CACHE: Create a project-specific subdirectory in the user's cache directory.
         self.cache_dir = user_cache_dir("swisslipidsreact")
         os.makedirs(self.cache_dir, exist_ok=True)
         self.output_dir = output_dir
         self.timestamp=timestamp
 
-    def preporcess_swisslipids(self):
+    def pre_process_swisslipids(self, output_file):
         """
         This function adds (free fatty acid) as component to FA and FA-COA and n-acyls to acylethanolamines
         """
-
+        logger.info( "Pre-processing SwissLipids file" )
+        
         with importlib.resources.files("swisslipidsreact.package_data").joinpath("lipids.tsv").open("rb") as f:
             self.swisslipids = pd.read_csv(f, sep="\t", encoding="latin-1",
                 usecols=['Name', 'Lipid ID', 'CHEBI', 'Level', 'Lipid class*', 'Components*', 'SMILES (pH7.3)'],
@@ -179,24 +184,26 @@ class SwissLipids():
         self.swisslipids.loc[self.swisslipids['Lipid ID'] == 'SLM:000598106', 'Components*'] = 'SLM:000000719 (acyl)'
 
         # Add extra rows with CoAs
-
         with importlib.resources.files("swisslipidsreact.package_data").joinpath("lipids_7rows_extra_CoAs.tsv").open("r") as f:
             df_extra_rows_coas = pd.read_csv(f, sep="\t")
 
         self.swisslipids = pd.concat([self.swisslipids, df_extra_rows_coas], ignore_index=True)
 
-        # your cache file path
-        cache_file = os.path.join(self.cache_dir, "lipids_preprocessed.tsv")
-        self.swisslipids.to_csv(cache_file, sep="\t", index=False)
+        self.swisslipids.to_csv(output_file, sep="\t", index=False)
     
     # ---------- Load SwissLipids Data ----------
     def read_swisslipids_from_file(self):
 
-        if not os.path.exists(os.path.join(self.cache_dir, "lipids_preprocessed.tsv")):
-            self.preporcess_swisslipids()
+        # TODO: This is fast, does not need caching?
+        f_cache_lipids_preprocessed = os.path.join(self.cache_dir, 'lipids_preprocessed.tsv')
+        if not os.path.exists(os.path.join(f_cache_lipids_preprocessed)):
+            logger.info( "Generating pre-processed SwissLipids file" )
+            self.pre_process_swisslipids(f_cache_lipids_preprocessed)
 
+        # TODO: This is fast, does not need caching?
         lipids_components_split_cache_file = os.path.join(self.cache_dir, 'lipids_components_split.tsv')
         if not os.path.exists(lipids_components_split_cache_file) or flag_fast_exec==False:
+            logger.info( "Extracting components into positions" )
             self.swisslipids = pd.read_csv(
                 os.path.join(self.cache_dir, "lipids_preprocessed.tsv"), sep='\t', encoding='latin-1',
                 usecols=['Name', 'Lipid ID', 'CHEBI', 'Level', 'Lipid class*', 'Components*', 'SMILES (pH7.3)'],
@@ -208,6 +215,7 @@ class SwissLipids():
             self.swisslipids['Level'].isna() & ~self.swisslipids['SMILES (pH7.3)'].str.contains('*', regex=False, na=False),
             'Level'] = 'Isomeric subspecies'
 
+            # TODO: Ask Lucila what this is
             # malonyl-CoA(5−)	CHEBI:57384
             # acetyl-CoA(4−)	CHEBI:57288
             # glycerone phosphate(2−)	CHEBI:57642
@@ -216,9 +224,7 @@ class SwissLipids():
             # dicarboxylic acid dianion CHEBI:28965
             self.swisslipids=self.swisslipids[~self.swisslipids['CHEBI'].isin(['57384', '57288', '57642', '57327', '13705', '28965'])]
 
-            print('splitting the components into the positions')
             # Define possible positions
-
             # Initialize columns to None
             for pos in positions:
                 self.swisslipids[pos] = None
@@ -252,8 +258,9 @@ class SwissLipids():
             for pos in positions:
                 self.swisslipids.loc[mask, pos] = df_iso.index.map(components_wide.get(pos))
             self.swisslipids.to_csv(lipids_components_split_cache_file, sep='\t', index=False)
-            print('DONE: splitting the components into the positions')
+            
         else:
+            logger.info( "Reading pre-processed SwissLipids file with components in positions" )
             self.swisslipids = pd.read_csv(lipids_components_split_cache_file, sep='\t', low_memory=False)
         
         # Filter to retain only isomeric subspecies in a seeparate df
@@ -434,3 +441,7 @@ class SwissLipids():
         # Filter isomeric subspecies
         isomeric_subspecies = self.swisslipids[self.swisslipids['Level'] == 'Isomeric subspecies']
         self.df_isomeric_subspecies = isomeric_subspecies.copy()
+        logger.info(  "LENGTH: df_isomeric_subspecies: %d", len(self.df_isomeric_subspecies))
+        logger.debug( "FORMAT: df_isomeric_subspecies\n%s", debug_df_first_row(self.df_isomeric_subspecies) )
+        if DEBUG > 1:
+            self.df_isomeric_subspecies.to_csv(os.path.join(self.output_dir, 'DEBUG_df_isomeric_subspecies.tsv'), sep="\t", header=True, index=False)

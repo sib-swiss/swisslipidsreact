@@ -1,9 +1,26 @@
+import logging
+import logging.config
 import argparse
+
+from .utils import DEBUG
 from .main import run_pipeline
 from .ttl_export import export_ttl
 from .MasterIdAnalysis import MasterIdAnalysis
 
+logger = logging.getLogger(__name__)
+
 def main():
+
+    # Configure logging:
+    # * fixed width left-aligned, e.g. %(levelname)-8s
+    # * truncate if too long, e.g. %(module)-20.20s
+    #   (width = 20, precision = 20 -> truncate to 20 characters)
+    logging.basicConfig(
+        level=logging.DEBUG if DEBUG > 0 else logging.INFO,
+        format="%(asctime)s %(levelname)-8s - %(module)-20.20s %(lineno)4d: %(message)s",
+        datefmt="%Y-%m-%d %H:%M"
+    )
+    
     parser = argparse.ArgumentParser(description="SwissLipids Reaction Pipeline")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -32,6 +49,7 @@ def main():
         default=False,
         help="No restrictions of FA per position"
     )
+    
     # ttl export command
     parser_export = subparsers.add_parser("export-ttl", help="Export RDF file from results")
     parser_export.add_argument(
@@ -39,7 +57,6 @@ def main():
         action="store_true",
         help="Use curated fatty acid list for TTL export (default: False for C16)"
     )
-
     parser_export.add_argument(
         "--input",
         type=str,
@@ -59,6 +76,7 @@ def main():
         help="RDF output format for exporting (nt, ttl etc.)"
     )
 
+    # Master id analysis
     parser_master_id_analysis = subparsers.add_parser("master-id-analysis", help="Master id analysis")
     parser_master_id_analysis.add_argument(
         "--input",
@@ -83,6 +101,7 @@ def main():
         default=False,
         help="No restrictions of FA per position"
     )
+    
     args = parser.parse_args()
 
     if args.command == "run":

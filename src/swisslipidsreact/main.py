@@ -1,12 +1,18 @@
+import logging
 import pandas as pd
 import glob
 import os
+import re
+
 from datetime import datetime
 
 from pyrheadb.RheaDB import RheaDB
 
+from .utils import DEBUG, debug_df_first_row
 from .SwissLipids import SwissLipids
 from .RheaToSwisslipidsDf import RheaToSwisslipidsDf
+
+logger = logging.getLogger(__name__)
 
 def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_restrictions=True, rheaid=None):
 
@@ -31,15 +37,28 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
 
     # Map SwissLipids to ChEBI, and merge with Rhea data
     df_swiss_lipids_chebi = sl.get_only_chebi_sl_df()
-
-    summary_lines.append(f'# swiss lipids * chebi\t{len(df_swiss_lipids_chebi)}')
+    logger.info(  "LENGTH: df_swiss_lipids_chebi: %d", len(df_swiss_lipids_chebi) )
+    logger.debug( "FORMAT: df_swiss_lipids_chebi\n%s", debug_df_first_row(df_swiss_lipids_chebi) )
+    if DEBUG > 1:
+        df_swiss_lipids_chebi.to_csv(os.path.join(output_dir, 'DEBUG_df_swiss_lipids_chebi.tsv'), sep="\t", header=True, index=False)
+    summary_lines.append(f'df_swiss_lipids_chebi\t{len(df_swiss_lipids_chebi)}')
 
     rdb = RheaDB()
+    # TODO: Rename to df_rhea2participant.
     rheadf = rdb.rhea_reaction_long_format_smiles_chebi
+    logger.info(  "LENGTH: rheadf: %d", len(rheadf) )
+    logger.debug( "FORMAT: rheadf\n%s", debug_df_first_row(rheadf) )
+    if DEBUG > 1:
+        rheadf.to_csv(os.path.join(output_dir, 'DEBUG_rheadb.tsv'), sep="\t", header=True, index=False)
     if rheaid:
         rheadf = rheadf[rheadf['MASTER_ID']==rheaid]
+    # TODO: Rename to df_rhea.
     rhea_reactions = rdb.df_reactions
-
+    logger.info(  "LENGTH: rhea_reactions: %d", len(rhea_reactions) )
+    logger.debug( "FORMAT: rhea_reactions\n%s", debug_df_first_row(rhea_reactions) )
+    if DEBUG > 1:
+        rhea_reactions.to_csv(os.path.join(output_dir, 'DEBUG_rhea_reactions.tsv'), sep="\t", header=True, index=False)
+    
     rhea_non_residue_reactions = rhea_reactions[rhea_reactions['residue_rxn_flag']==False]
     rhea_class_reactions = rhea_reactions[rhea_reactions['Web-RInChIKey'].isna()]
     rheadf = rheadf[rheadf['MASTER_ID'].isin(rhea_non_residue_reactions['MASTER_ID'])]
@@ -107,6 +126,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     r2sl = RheaToSwisslipidsDf(output_dir=output_dir, timestamp=timestamp)
     r2sl.get_df_swiss_lipids_chebi_rhea(df_swiss_lipids_chebi, df_rhea_chebi)
     SLMs_in_rhea = r2sl.df_swiss_lipids_chebi_rhea['Lipid ID'].unique()
+    logger.info( "Statistics: SLMs_in_rhea: %d", len(SLMs_in_rhea) )
 
     MASTER_IDs = r2sl.df_swiss_lipids_chebi_rhea['MASTER_ID'].unique()
     summary_lines.append(f'Class reaction Rhea IDs without polymers (lipid + non-lipid)\t{len(MASTER_IDs)}')
@@ -121,29 +141,44 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
         except:
             return '[C:1]>>[C:1]' # return dummy atom mapped equation that will return 0 bond changes
 
-    if not os.path.exists('rhea_reactions_bond_changes.tsv'):
+    # CACHE: This takes app. 20min.
+    f_cache_rhea_reactions_bond_changes = os.path.join(sl.cache_dir, 'rhea_reactions_bond_changes.tsv')
+    if not os.path.exists(f_cache_rhea_reactions_bond_changes):
+        logger.info( "progress_apply: Generating rhea_reactions_bond_changes.tsv - Part 1" )
         rhea_reactions['rxnsmiles_I_mapped'] = rhea_reactions['rxnsmiles_I'].progress_apply(lambda x: get_attention_guided_atom_map_error_wrap(x))
+        logger.info( "progress_apply: Generating rhea_reactions_bond_changes.tsv - Part 2" )
         rhea_reactions['bond_changes'] = rhea_reactions['rxnsmiles_I_mapped'].progress_apply(lambda x: len(r2sl.mapped_reaction_to_report(x)['bond_changes']))
-        rhea_reactions.to_csv('rhea_reactions_bond_changes.tsv', sep='\t', index=False)
+        rhea_reactions.to_csv(f_cache_rhea_reactions_bond_changes, sep='\t', index=False)
 
-    df_bc = pd.read_csv('rhea_reactions_bond_changes.tsv', sep='\t')
+    logger.info( "Reading rhea_reactions_bond_changes.tsv" )
+    df_bc = pd.read_csv(f_cache_rhea_reactions_bond_changes, sep='\t')
+    logger.info(  "LENGTH: df_bc: %d", len(df_bc) )
+    logger.debug( "FORMAT: df_bc: %s", debug_df_first_row(df_bc) )
     bond_changes_lookup = dict(zip(df_bc['MASTER_ID'], df_bc['bond_changes']))
 
     # Analyse the directed graph of SwissLipid ontology and get all isomeric subspecies per SLM in Rhea
     rhea_lipid_to_descendant_df = sl.get_lipid_to_descendant_df(SLMs_in_rhea)
-    summary_lines.append(f'# swiss lipids * chebi * rhea\t{len(r2sl.df_swiss_lipids_chebi_rhea)}')
-    summary_lines.append(f'isomeric subspecies descendants of lipids * Rhea\t{len(rhea_lipid_to_descendant_df)}')
-    summary_lines.append(f'unique Lipid ID isomeric subspecies descendants of lipids in Rhea\t{len(set(rhea_lipid_to_descendant_df["isomeric_subspecies_descendant_lipid_id"]))}')
-
+    logger.info(  "LENGTH: rhea_lipid_to_descendant_df: %d", len(rhea_lipid_to_descendant_df) )
+    logger.debug( "FORMAT: rhea_lipid_to_descendant_df\n%s", debug_df_first_row(rhea_lipid_to_descendant_df) )
+    summary_lines.append(f'r2sl.df_swiss_lipids_chebi_rhea\t{len(r2sl.df_swiss_lipids_chebi_rhea)}')
+    summary_lines.append(f'rhea_lipid_to_descendant_df\t{len(rhea_lipid_to_descendant_df)}')
+    summary_lines.append(f'rhea_lipid_to_descendant_df unique Lipid ID isomeric subspecies\t{len(set(rhea_lipid_to_descendant_df["isomeric_subspecies_descendant_lipid_id"]))}')
+    
     # next df uses pos_descr_to_FA_list ->
     if no_curated_list_restrictions == False:
         class_lipid_to_descendants_df, all_lipids_considered = sl.filter_curated_biologically_relevant_isomeric_subspecies_only(curated_fa_list_run=curated_fa_list_run)
-        summary_lines.append(f'Total biologically human-relevant descendants of the class lipids identified in SwissLipids\t{len(class_lipid_to_descendants_df)}')
+        summary_lines.append(f'class_lipid_to_descendants_df (biologically human-relevant)\t{len(class_lipid_to_descendants_df)}')
         rhea_lipid_to_descendant_df_not_filtered=rhea_lipid_to_descendant_df[~rhea_lipid_to_descendant_df['Lipid ID'].isin(all_lipids_considered)]
         class_lipid_to_descendants_df = pd.concat([class_lipid_to_descendants_df, rhea_lipid_to_descendant_df_not_filtered]) # adding those lipids that were not in the list with positions
     elif no_curated_list_restrictions == True:
         class_lipid_to_descendants_df = rhea_lipid_to_descendant_df
     
+    # FORMAT: class_lipid_to_descendants_df = rhea_lipid_to_descendant_df
+    logger.info(  "LENGTH: class_lipid_to_descendants_df: %d", len(class_lipid_to_descendants_df) )
+    logger.debug( "FORMAT: class_lipid_to_descendants_df\n%s", debug_df_first_row(class_lipid_to_descendants_df) )
+
+    # TODO: This does nothing after Anastasia added rhea_lipid_to_descendant_df_not_filtered in commit bf64643.
+    # But keep it for now, to test other filtering approaches.
     rhea_lipid_to_descendant_df_temp = rhea_lipid_to_descendant_df[rhea_lipid_to_descendant_df['Lipid ID'].isin(class_lipid_to_descendants_df['Lipid ID'])]
 
     Rhea_x_swisslipid_isomeric_subspecies, \
@@ -176,5 +211,10 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
         for key, value in stats_dict.items():
             f.write(f'{key}\t{value}\n')
 
-    print(f'Summary saved to {summary_results_file}')
+    logger.info( "Summary saved to %s\n", summary_results_file )
 
+    # rhea_reactions['x_...'] contains a Pandas boolean Series. Use sum() to get number of True.
+    pattern = r'^\d+_'
+    for key, value in rhea_reactions.items():
+        if re.match(pattern, key):
+            print(value.sum(), " - ", key)

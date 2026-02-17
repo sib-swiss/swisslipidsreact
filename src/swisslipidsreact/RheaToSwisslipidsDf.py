@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import pandas as pd
@@ -12,7 +13,13 @@ from pyrheadb.RInChI import RInChI
 
 from tqdm import tqdm
 
+from .utils import DEBUG, debug_df_first_row
 from .FA_lists import positions
+
+logger = logging.getLogger(__name__)
+
+# tqdm.pandas() wraps pandas.apply() method with a tqdm progress bar.
+# Use for long-running apply() if you want to monitor progress.
 tqdm.pandas()
 
 class TimeoutException(Exception):
@@ -38,23 +45,38 @@ class RheaToSwisslipidsDf():
         # ---------- Merge to Obtain Rhea Reactions of Specific Subspecies ----------
 
     def get_df_rhea_descendant(self, rhea_lipid_to_descendant_df, df_swisslipids):
+
+        # FORMAT: rhea_lipid_to_descendant_df = same as in main.py
+        logger.info(  "LENGTH: rhea_lipid_to_descendant_df: %d", len(rhea_lipid_to_descendant_df) )
+        logger.info(  "LENGTH: df_swisslipids: %d", len(df_swisslipids) )
+        logger.debug( "FORMAT: df_swisslipids\n%s", debug_df_first_row(df_swisslipids) )
+
+        logger.debug( "LEFT merging df_swiss_lipids_chebi_rhea WITH rhea_lipid_to_descendant_df ON 'Lipid ID' = 'rhea_lipid_id'" )
         df_rhea_descendant = self.df_swiss_lipids_chebi_rhea.merge(
             rhea_lipid_to_descendant_df, left_on='Lipid ID', right_on='rhea_lipid_id', how='left'
         )
+        logger.info(  "LENGTH: df_rhea_descendant: %d", len(df_rhea_descendant) )
+        logger.debug( "FORMAT: df_rhea_descendant\n%s", debug_df_first_row(df_rhea_descendant) )
 
+        logger.debug( "Selecting a subset of columns of df_rhea_descendant" )
         df_rhea_descendant = df_rhea_descendant[[
             'MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef',
             'rhea_lipid_id', 'isomeric_subspecies_descendant_lipid_id', 'smiles'
         ]]
+        logger.debug( "FORMAT: df_rhea_descendant\n%s", debug_df_first_row(df_rhea_descendant) )
 
+        logger.debug( "LEFT merging df_rhea_descendant WITH df_swisslipids ON 'Lipid ID'" )
         df_rhea_descendant = df_rhea_descendant.merge(
             df_swisslipids, left_on='isomeric_subspecies_descendant_lipid_id',
             right_on='Lipid ID', how='left'
         )
-
+        logger.info(  "LENGTH: df_rhea_descendant: %d", len(df_rhea_descendant) )
+        logger.debug( "FORMAT: df_rhea_descendant\n%s", debug_df_first_row(df_rhea_descendant) )
+        
+        logger.debug( "Dropping 3 columns of df_rhea_descendant: 'Lipid ID', 'Level', 'Lipid class*'" )
         df_rhea_descendant.drop(columns=['Lipid ID', 'Level', 'Lipid class*'], inplace=True)
-        # print('Rhea * swisslipid isomeric subspecies', len(df_rhea_descendant))
-        # print('Unique swisslipid isomeric subspecies in Rhea', len(set(df_rhea_descendant['isomeric_subspecies_descendant_lipid_id'])))
+        logger.info(  "LENGTH: df_rhea_descendant: %d", len(df_rhea_descendant) )
+        logger.debug( "FORMAT: df_rhea_descendant\n%s", debug_df_first_row(df_rhea_descendant) )
 
         self.df_rhea_descendant = df_rhea_descendant
         return len(df_rhea_descendant), len(set(df_rhea_descendant['isomeric_subspecies_descendant_lipid_id']))
@@ -76,14 +98,13 @@ class RheaToSwisslipidsDf():
     
     # ---------- Reaction Generation Functions ----------
     def build_equations(self, combination, df_right):
-
+        """Constructs reaction SMILES and corresponding equations from a reaction component combination."""
         res_final = []
         res_backup = []
-        """Construct reaction SMILES and corresponding equations from a reaction component combination."""
         df_left = pd.DataFrame(combination)
 
         def get_smiles(row):
-            """Select SMILES (pH7.3) if available, otherwise use fallback SMILES."""
+            """Selects 'SMILES (pH7.3)' column if available and otherwise 'smiles' column."""
             return row['SMILES (pH7.3)'] if pd.notna(row['SMILES (pH7.3)']) else row['smiles']
         
         def combination_to_equations(df_left, df_right_temp):
@@ -141,7 +162,6 @@ class RheaToSwisslipidsDf():
         chebi_groups = [grp.to_dict('records') for _, grp in df_right.groupby('chebi_id')]
         
         if len(df_right)==0:
-            #print(df_left)
             return [], 'no_component_match'
         for combo in product(*chebi_groups):
             df_right_temp = pd.DataFrame(combo)
@@ -169,7 +189,7 @@ class RheaToSwisslipidsDf():
     def generate_combinations_and_reactions(self, df):
         """Generates all valid reaction SMILES and equation strings for each MASTER_ID."""
 
-        print('Extracting stoichiometric coefficients per compound ->')
+        logger.info( "progress_apply: Extracting stoichiometric coefficients per compound" )
         df['components'] = df.progress_apply(self.extract_stoichiometric_components, axis=1)
         all_results = []
         df['side'] = df['reaction_side'].apply(lambda x: x.split('_')[1])
@@ -178,7 +198,7 @@ class RheaToSwisslipidsDf():
 
         total_gen_attempted = len(df_left['reaction_side'].unique())
 
-        print('Generating combinations of reactants and products ->')
+        logger.info( "progress_apply: Enumerating reactions" )
         for reaction_side_master_id, group in tqdm(df_left.groupby('reaction_side')):
             df_right_master_id = df_right[df_right['MASTER_ID']==int(reaction_side_master_id.split('_')[0])]
             signal.alarm(90000)
@@ -194,13 +214,13 @@ class RheaToSwisslipidsDf():
                                 'swisslipids_equation': swisslipids_eq, 
                                 'components_equation': components_equation,
                                 'reaction_smiles': reaction,
-                                'component_match':component_match
+                                'component_match': component_match
                             })
             except TimeoutException:
-                print(f"MASTER ID {reaction_side_master_id.split('_')[0]} took too long and was skipped.", len(df))
+                logger.warning( "MASTER ID %s took too long and was skipped: %d", reaction_side_master_id.split('_')[0], len(df) )
                 continue
             finally:
-                signal.alarm(0)  # Cancel alarm
+                signal.alarm(0) # Cancel alarm.
         return pd.DataFrame(all_results), total_gen_attempted
 
     def extract_atom_environment(self, mol):
@@ -295,17 +315,43 @@ class RheaToSwisslipidsDf():
 
     def save_results(self, rheadf, df, rhea_reactions, filename, bond_changes_lookup):
 
+        # Arguments: df = r2sl.df_rhea_descendant
+        logger.info(  "LENGTH: rheadf: %d", len(rheadf) )
+        logger.info(  "LENGTH: df: %d", len(df) )
+        logger.debug( "FORMAT: df\n%s", debug_df_first_row(df) )
+        if DEBUG > 1:
+            df.to_csv(os.path.join(self.output_dir, 'DEBUG_df.tsv'), sep="\t", header=True, index=False)
+        
+        # Get subset of columns of rhea2participant dataframe.
         df_rhea_cut = rheadf[['MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'smiles']]
+        # Get subset of rows where MASTER_ID is in df (= r2sl.df_rhea_descendant).
         df_rhea_cut = df_rhea_cut[df_rhea_cut['MASTER_ID'].isin(df['MASTER_ID'])]
+        logger.info(  "LENGTH: df_rhea_cut: %d", len(df_rhea_cut) )
+        logger.debug( "FORMAT: df_rhea_cut\n%s", debug_df_first_row(df_rhea_cut) )
+
+        # TODO: Why RIGHT merge? Why first filter df_rhea_cut by MASTER_ID?
+        logger.debug( "RIGHT merging df WITH df_rhea_cut ON MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'smiles'" )
         df = df.merge(
             df_rhea_cut, on=['MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'smiles'], how='right'
         )
+        logger.info(  "LENGTH: df: %d", len(df) )
+        logger.debug( "FORMAT: df\n%s", debug_df_first_row(df) )
+        if DEBUG > 0:
+            df.to_csv(os.path.join(self.output_dir, 'DEBUG_df-after_merge.tsv'), sep="\t", header=True, index=False)
+
         result_df, total_gen_attempted = self.generate_combinations_and_reactions(df)
+        logger.info( "Statistics: Reactions enumerated: %d\n", len(result_df) )
+        logger.debug( "FORMAT: result_df\n%s", debug_df_first_row(result_df) )
+        if DEBUG > 1:
+            result_df.to_csv(os.path.join(self.output_dir, 'DEBUG_result_df-reactions_enumerated.tsv'), sep="\t", header=True, index=False)
         rhea_reactions['5_after_enumerating_combinations'] = rhea_reactions['MASTER_ID'].isin(result_df['MASTER_ID'])
+
+        # Drop rows without reaction SMILES.
         result_df.dropna(subset = ['reaction_smiles'], inplace=True)
+        logger.info( "Statistics: Reactions after dropping those without reaction SMILES: %d\n", len(result_df) )
         rhea_reactions['6_after_dropping_na_reaction_smiles'] = rhea_reactions['MASTER_ID'].isin(result_df['MASTER_ID'])
         MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced = len(set(result_df['MASTER_ID']))
-        num_reactions_to_check_for_balance = len(result_df) # Total # of reactions to check for balance
+        num_reactions_to_check_for_balance = len(result_df)
         
         def extract_position_map(eq_side: str) -> dict[str, str]:
             """
@@ -350,54 +396,62 @@ class RheaToSwisslipidsDf():
                     out[f'{p}_change'] = (start is not None and end is not None and start != end)
             return out
 
-        print('Checking component balance')
+        logger.info( "progress_apply: Checking components balanced" )
+        # Example rows:
+        # MASTER_ID: components_equation
+        # 10100: nan + SLM:000000510 (acyl) = nan + nan + SLM:000000510 (free fatty acid)
+        # 10272: SLM:000000510 (sn1 or sn2) + nan = nan + SLM:000000510 (sn1 or sn2) + nan
+        # 10352: nan + nan = nan + nan
         parsed = result_df['components_equation'].progress_apply(summarise).apply(pd.Series)
         result_df = pd.concat([result_df, parsed], axis=1)
+        if DEBUG > 0:
+            result_df.to_csv(os.path.join(self.output_dir, 'DEBUG_result_df-before-applying-components-balanced.tsv'), sep="\t", header=True, index=False)
 
-        # List all columns ending with "_change"
-        change_cols = [col for col in result_df.columns if col.endswith('_change')]
-
-        # Select rows where at least one position has changed
-        # df_changed = result_df[result_df[change_cols].any(axis=1)]
-        # df_changed.drop_duplicates(subset=['MASTER_ID'],inplace=True)
-        # df_changed.to_csv('changes_examples.tsv', sep='\t', index=False)
-
-        df_change_of_sn_by_design = result_df[result_df['MASTER_ID'].isin([63596, 78043, 77759, 78435])]
+        # Store exceptions:
         # 63596, 78043, 77759, 78435 have triglyceride twice in reactants, therefore sn1 is not unique, 
         # there is sn1 of the first tryglyceride, and sn2 of the second, which makes the code confused
+        df_change_of_sn_by_design = result_df[result_df['MASTER_ID'].isin([63596, 78043, 77759, 78435])]
         df_change_of_sn_by_design['component_match']='no_component_match'
-
+        # Get list of boolean '_change' columns and remove rows where any of them is True.
+        change_cols = [col for col in result_df.columns if col.endswith('_change')]
         result_df = result_df[~result_df[change_cols].any(axis=1)]
+        # Now add back the exceptions.
         result_df = pd.concat([result_df, df_change_of_sn_by_design])
-
+        if DEBUG > 0:
+            result_df.to_csv(os.path.join(self.output_dir, 'DEBUG_result_df-after-checking-components-balanced.tsv'), sep="\t", header=True, index=False)
+        logger.info( "Statistics: Reactions after filtering by component match: %d\n", len(result_df) )
         rhea_reactions['7_after_dropping_incorrect_component_matches'] = rhea_reactions['MASTER_ID'].isin(result_df['MASTER_ID'])
 
         # Filter for balanced reactions
         rxn = Reaction()
-        print('checking reaction balance')
+        logger.info( "progress_apply: Checking reaction balanced" )
         result_df['balanced'] = result_df['reaction_smiles'].progress_apply(rxn.check_reaction_balance)
         result_df = result_df[result_df['balanced']==True]
         result_df.drop(columns=['balanced'], inplace=True)
         MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced = len(set(result_df['MASTER_ID']))
         rhea_reactions['8_after_dropping_unbalanced_reactions'] = rhea_reactions['MASTER_ID'].isin(result_df['MASTER_ID'])
         num_reactions_after_filtering_out_the_unbalanced = len(result_df)
-        print('Check that correct number of bonds are broken/formed at the same time')
+        logger.info( "Statistics: Reactions after filtering by balance: %d\n", len(result_df) )
+        # Filter by bond changes
+        logger.info( "progress_apply: Checking number of bond changes" )
         result_df['bond_breakage_max_4'] = result_df.progress_apply(self.check_reactions_for_which_component_matching_was_impossible_with_atom_mapper, axis=1, args=[bond_changes_lookup,])
         result_df = result_df[result_df['bond_breakage_max_4']==True]
+        logger.info( "Statistics: Reactions after filtering by bond changes: %d\n", len(result_df) )
         rhea_reactions.to_csv(os.path.join(self.output_dir, f'{self.timestamp}_rhea_reactions_overview.tsv'), sep='\t', index=False)
 
         # Generate RInChI and Web-RInChIKey
+        logger.info( "progress_apply: Generating RInChI" )
         rinchi = RInChI()
-        print("Generating RInChI")
         if len(result_df)>0:
             result_df[['RInChI', 'Web-RInChIKey']] = result_df.progress_apply(
                 lambda x: rinchi.error_handle_wrap_rinchi(x['reaction_smiles']),
                 axis=1, result_type='expand'
             )
         
-            # Clean the data of the reactions withour Web-RInChIKey (without structures) and dulpicates
+            # Remove reactions without Web-RInChIKey (without structures) and duplicates
             result_df.dropna(subset=['Web-RInChIKey'], inplace=True)
             result_df.drop_duplicates(subset=['MASTER_ID', 'Web-RInChIKey', 'reaction_smiles'], inplace=True)
+            logger.info( "Statistics: Number of reactions after removing empty and duplicated by Web-RInChIKey: %d", len(result_df) )
             
             # Save final result
             result_df.to_csv(os.path.join(self.output_dir, filename), sep='\t', index=False)
