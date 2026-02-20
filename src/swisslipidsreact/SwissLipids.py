@@ -230,33 +230,36 @@ class SwissLipids():
                 self.swisslipids[pos] = None
 
             # Work only on rows where Level == 'Isomeric subspecies'
-            mask = self.swisslipids['Level'] == 'Isomeric subspecies'
-            df_iso = self.swisslipids[mask].copy()
+            is_iso = self.swisslipids['Level'] == 'Isomeric subspecies'
+            df_iso = self.swisslipids[is_iso].copy()
 
-            # Extract (SLM ID, position info)
+            # The 'Components*' column contains 1-n components, each with 1-m positions :-(
+            # Example: SLM:000001124 (sn2) / SLM:000001208 (sn1 or sn1')
+            # Here we create one column for each position and store the corresponding component there.
             pattern = r'(SLM:\d+)\s+\(([^)]+)\)'
             extracted = df_iso['Components*'].str.extractall(pattern)
             extracted.columns = ['SLM', 'positions']
             extracted['row'] = extracted.index.get_level_values(0)
 
-            # Expand position info (e.g. "sn1 or sn2")
+            # Expand positions string (e.g. sn1 or sn1').
             extracted = extracted.assign(position=extracted['positions'].str.split(r'\s*(?:or|,|and)\s*')).explode('position')
-            extracted['position'] = extracted['position'].str.strip()
+            extracted['position'] = extracted['position'].str.strip() # Correct whitespace errors.
 
-            # Keep only defined positions
+            # Keep only the defined positions (there should be no others).
             extracted = extracted[extracted['position'].isin(positions)]
-            if len(extracted[~extracted['position'].isin(positions)]>0):
-                print(extracted[~extracted['position'].isin(positions)])
+            if len(extracted[~extracted['position'].isin(positions)] > 0):
+                logger.warning("Unknown positions: %s\n", extracted[~extracted['position'].isin(positions)])
 
-            # Drop duplicates to enforce single SLM per position
+            # Drop duplicates to enforce a single SLM per position.
             extracted = extracted.drop_duplicates(subset=['row', 'position'])
 
             # Pivot to wide format
             components_wide = extracted.pivot(index='row', columns='position', values='SLM')
 
-            # Assign values back to original df only for Isomeric subspecies rows
+            # Add the new columns to the original df (only for Isomeric subspecies rows).
             for pos in positions:
-                self.swisslipids.loc[mask, pos] = df_iso.index.map(components_wide.get(pos))
+                self.swisslipids.loc[is_iso, pos] = df_iso.index.map(components_wide.get(pos))
+            
             self.swisslipids.to_csv(lipids_components_split_cache_file, sep='\t', index=False)
             
         else:
