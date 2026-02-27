@@ -42,7 +42,7 @@ class Participant(NamedTuple):
     smiles: str                  # row['SMILES (pH7.3)'] if present else row['smiles']
     iso_lipid_id: Optional[str]  # row['isomeric_subspecies_descendant_lipid_id'] or None
     components: Tuple[str, ...]  # tuple of components; duplicates already included by stoich
-    comp_counter: Counter        # Counter of components, e.g. Counter({'C1': 2, 'C2': 1}), for equality check.
+    comp_counter: Counter        # Counter of components, e.g. Counter({'C1': 2, 'C2': 1}), to prune combinations.
     comp_text: str               # str(row['Components*']) for components_equation
 
 class RheaToSwisslipidsDf():
@@ -101,6 +101,7 @@ class RheaToSwisslipidsDf():
         against all right-side combinations. Pure-Python, no per-iteration DataFrames.
         Returns (list_of_4tuples, 'yes_component_match' | 'no_component_match').
         """
+        
         # Helper function to build equations from left and right list of Participants.
         def __build_equations_from_participants(left_participants: List[Participant], right_participants: List[Participant]) -> Tuple[str, str, str, str]:
             smiles_left: List[str] = []
@@ -146,24 +147,25 @@ class RheaToSwisslipidsDf():
             if participant.components:
                 left_components.update(participant.components)
 
-        # Filter the candidates of right participants by the left participants' components (if any).
+        # From each right group, eliminate those participants with components that do not exist on the left side.
         right_groups_filtered: List[List[Participant]] = []
-        for right_participants in right_groups:
+        for right_group in right_groups:
             if left_components:
                 filtered_group = [participant
-                                  for participant in right_participants
+                                  for participant in right_group
                                   if (not participant.components)
                                   or all((comp in left_components) for comp in participant.components)]
             else:
-                filtered_group = right_participants
+                filtered_group = right_group
 
-            # If the filtered right side is empty, return empty list + no match
+            # If one of the filtered right groups is empty, return empty list + no match.
             if not filtered_group:
                 return [], 'no_component_match'
             
             right_groups_filtered.append(filtered_group)
         
-        # Enumerate the right-side combinations and eliminate those with unequal components counts.
+        # Loop over the cartesian product of the participants in the filtered
+        # right groups, skipping those with unequal components counts.
         for right_combination in product(*right_groups_filtered):
             right_counter = Counter()
             for participant in right_combination:
@@ -177,13 +179,14 @@ class RheaToSwisslipidsDf():
             # and where the number of components are equal on both sides.
             if left_size > 0 and left_counter == right_counter:
                 res_final.append(__build_equations_from_participants(left_participants, list(right_combination)))
-            else: 
+            else:
+                # TODO: Do we keep these just for debugging? Could be expensive?
                 res_backup.append(__build_equations_from_participants(left_participants, list(right_combination)))
 
         if res_final:
             return res_final, 'yes_component_match'
         return res_backup, 'no_component_match'
-
+    
     def __enumerate_reactions(self, df):
         """Generates all valid reaction SMILES and equation strings for each MASTER_ID."""
 
@@ -220,8 +223,8 @@ class RheaToSwisslipidsDf():
         # Helper function to group participants by their class.
         def __group_participants_by_class(df_participants: pd.DataFrame) -> List[List[Participant]]:
             """
-            Groups the participants (isomeric subspecies lipid ID) by their class (CHEBI ID).
-            Returns list of participants lists, grouped by CHEBI ID, keeping stable order.
+            Groups the participants (isomeric subspecies lipid ID) by their class (Rhea CHEBI ID).
+            Returns List[ Rhea CHEBI ID->List[ isomeric subspecies lipid ID ] ], keeping stable order.
             """
             groups: Dict[str, List[Participant]] = {}
             # Convert DataFrame to Dict of lipid class(CHEBI) -> list of isomeric subspecies(participants).
@@ -247,13 +250,18 @@ class RheaToSwisslipidsDf():
         results = []
         
         logger.info("progress_apply: Enumerating reactions")
-        for reaction_side, df_left_group in tqdm(df_left.groupby('reaction_side')):
-            master_id = int(reaction_side.split('_')[0])
+        # Loop over the left side, grouped by Rhea ID.
+        for left_reaction_side, df_left_group in tqdm(df_left.groupby('reaction_side')):
+            master_id = int(left_reaction_side.split('_')[0])
+            # Get the right side for this Rhea ID.
             df_right_group = df_right[df_right['MASTER_ID'] == master_id]
 
             signal.alarm(90000)
             try:
-                # Convert pandas to lightweight Python data structure to make the enumeration fast.  
+                # Group the hypothetical participants (isomeric subspecies lipid IDs)
+                # of each side by their classes (Rhea CHEBIs).
+                # At the same time, convert pandas to lightweight Python data
+                # structure to make the enumeration fast.
                 left_groups:  List[List[Participant]] = __group_participants_by_class(df_left_group)
                 right_groups: List[List[Participant]] = __group_participants_by_class(df_right_group)
 
@@ -261,7 +269,7 @@ class RheaToSwisslipidsDf():
                 if not left_groups or not right_groups:
                     continue
 
-                # Loop over the cartesian product of the left combinations:
+                # Loop over the cartesian product of the participants in the left groups:
                 for left_combination in product(*left_groups):
                     # For each left combination, build the equations with the right combinations with pruning.
                     res_total, component_match = self.__build_equations(left_combination, right_groups)
@@ -277,7 +285,7 @@ class RheaToSwisslipidsDf():
                             })
             except TimeoutException:
                 logger.warning("MASTER ID %s took too long and was skipped: %d",
-                               reaction_side_master_id.split('_')[0], len(df))
+                               master_id.split('_')[0], len(df))
                 continue
             finally:
                 signal.alarm(0) # Cancel alarm.
