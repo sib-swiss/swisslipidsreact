@@ -293,9 +293,9 @@ class SwissLipids():
         Creates df prefiltered to only have lipids specific for a particular positions / FA
         Columns:
         ['class_slm_id', 'iso_slm_id', 'Lipid ID',
-       'Level', 'Name', 'Lipid class*', 'Components*', 'SMILES (pH7.3)',
-       'CHEBI', 'sn1'', 'sn2'', 'n-acyl', 'sn1', 'sn2', 'sn3',
-       'free fatty acid', 'free fatty alcohol']
+        'Level', 'Name', 'Lipid class*', 'Components*', 'SMILES (pH7.3)',
+        'CHEBI', 'sn1'', 'sn2'', 'n-acyl', 'sn1', 'sn2', 'sn3',
+        'free fatty acid', 'free fatty alcohol']
         """
 
         # Generate FA pools only once

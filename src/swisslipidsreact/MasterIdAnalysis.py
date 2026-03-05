@@ -183,7 +183,7 @@ class MasterIdAnalysis:
         # master_id_star_compound_is_lipid = df_master_ids_with_a_swisslipid[
         #     (
         #         (df_master_ids_with_a_swisslipid['smiles'].str.contains(r'\*', regex=True)) &
-        #         (df_master_ids_with_a_swisslipid['class_slm_id'].notna() | (df_master_ids_with_a_swisslipid['rhea_slm_id'] == '') | (df_master_ids_with_a_swisslipid['rhea_slm_id'] == 'NA'))
+        #         (df_master_ids_with_a_swisslipid['class_slm_id'].notna() | (df_master_ids_with_a_swisslipid['class_slm_id'] == '') | (df_master_ids_with_a_swisslipid['class_slm_id'] == 'NA'))
         #     )
         # ]['MASTER_ID'].unique()
 
@@ -210,7 +210,7 @@ class MasterIdAnalysis:
         r2sl.build_df_rhea2participants2slm_class2iso(df_rhea_slm_class2iso_temp, sl.swisslipids)
 
         r2sl.df_rhea2participants2slm_class2iso = r2sl.df_rhea2participants2slm_class2iso[r2sl.df_rhea2participants2slm_class2iso['MASTER_ID'].isin(df_master_id_star_compounds_star_is_lipid['MASTER_ID'])]
-        print('Unique class lipid ids in Rhea:', len(r2sl.df_rhea2participants2slm_class2iso['rhea_slm_id'].unique()))
+        print('Unique class lipid ids in Rhea:', len(r2sl.df_rhea2participants2slm_class2iso['class_slm_id'].unique()))
         print('Unique lipid isomeric subspecies descendants in Rhea:', len(r2sl.df_rhea2participants2slm_class2iso['iso_slm_id'].unique()))
 
         df_star_compounds_isomeric_subspecies_na = r2sl.df_rhea2participants2slm_class2iso[
@@ -243,7 +243,7 @@ class MasterIdAnalysis:
         print('df_star_compounds_enumerated unique MASTER_ID:', len( df_star_compounds_enumerated['MASTER_ID'].unique()))
         print('Example star_compounds_enumerated', random.sample(df_star_compounds_enumerated['MASTER_ID'].unique().tolist(), 3))
         print('df_star_compounds_enumerated unique chebi id:', len( df_star_compounds_enumerated['chebi_id'].unique()))
-        print('df_star_compounds_enumerated unique rhea lipid id:', len( df_star_compounds_enumerated['rhea_slm_id'].unique()))
+        print('df_star_compounds_enumerated unique rhea lipid id:', len( df_star_compounds_enumerated['class_slm_id'].unique()))
         print('df_star_compounds_enumerated unique iso_slm_id:', len( df_star_compounds_enumerated['iso_slm_id'].unique()))
 
         print()
@@ -287,12 +287,11 @@ class MasterIdAnalysis:
         print(master_ids_enumerated-compounds_enumerated)
         print('Both', len(set(results_overview['MASTER_ID'].tolist()).intersection(set(df_star_compounds_enumerated['MASTER_ID'].tolist()))))
         print()
-        df_reaction_enumerated =  df_star_compounds_enumerated[df_star_compounds_enumerated['MASTER_ID'].isin(set(results_overview['MASTER_ID'].tolist()))]
+        df_reaction_enumerated = df_star_compounds_enumerated[df_star_compounds_enumerated['MASTER_ID'].isin(set(results_overview['MASTER_ID'].tolist()))]
         print('df_reaction_enumerated unique MASTER_ID:', len(df_reaction_enumerated['MASTER_ID'].unique()))
         print('df_reaction_enumerated unique chebi IDs:', len(df_reaction_enumerated['chebi_id'].unique()))
-        print('df_reaction_enumerated unique rhea SLM IDs:', len(df_reaction_enumerated['rhea_slm_id'].unique()))
+        print('df_reaction_enumerated unique rhea SLM IDs:', len(df_reaction_enumerated['class_slm_id'].unique()))
         print('df_reaction_enumerated unique isomeric SLM IDs:', len(df_reaction_enumerated['iso_slm_id'].unique()))
 
         df_input_for_graph = df_star_compounds_enumerated[df_star_compounds_enumerated['MASTER_ID'].isin(set(df_star_compounds_enumerated['MASTER_ID'].tolist())-set(results_overview['MASTER_ID'].tolist()))]
-        #df_intput_for_graph.drop_duplicates(subset=['MASTER_ID', 'chebi_id', 'rhea_slm_id'], inplace=True)
         df_input_for_graph.to_csv('input_for_graph.tsv', sep='\t', index=False)

@@ -40,7 +40,8 @@ class Participant(NamedTuple):
     side: str                    # 'L' or 'R'
     stoich: int                  # int(row['stoich_coef']) or 1
     smiles: str                  # row['SMILES (pH7.3)'] if present else row['smiles']
-    iso_slm_id: Optional[str]    # row['iso_slm_id'] or None
+    iso_slm_id: Optional[str]    # row['iso_slm_id'] or row['chebi_display']
+    iso_slm_name: Optional[str]  # row['iso_slm_name'] or row['chebi_display']
     components: Tuple[str, ...]  # tuple of components; duplicates already included by stoich
     comp_counter: Counter        # Counter of components, e.g. Counter({'C1': 2, 'C2': 1}), to prune combinations.
     comp_text: str               # str(row['Components*']) for components_equation
@@ -70,10 +71,10 @@ class RheaToSwisslipidsDf():
         logger.info(  "LENGTH: df_rhea2participants2slm_class2iso: %d", len(df_rhea2participants2slm_class2iso) )
         logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
 
-        logger.debug( "Selecting a subset of columns of df_rhea2participants2slm_class2iso" )
+        logger.debug( "Selecting a subset of columns of df_rhea2participants2slm_class2iso and renaming some" )
         df_rhea2participants2slm_class2iso = df_rhea2participants2slm_class2iso[[
-            'MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'class_slm_id', 'iso_slm_id', 'smiles'
-        ]]
+            'MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'class_slm_id', 'iso_slm_id', 'smiles', 'Name'
+        ]].rename(columns={'Name': 'iso_slm_name'})
         logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
 
         logger.debug( "LEFT merging df_rhea2participants2slm_class2iso WITH df_swisslipids ON 'iso_slm_id' = 'Lipid ID'" )
@@ -108,6 +109,8 @@ class RheaToSwisslipidsDf():
             chebi_right: List[str] = []
             slm_id_left: List[str] = []
             slm_id_right: List[str] = []
+            slm_name_left: List[str] = []
+            slm_name_right: List[str] = []
             comp_left: List[str] = []
             comp_right: List[str] = []
 
@@ -116,21 +119,24 @@ class RheaToSwisslipidsDf():
                 if row.stoich > 0 and row.smiles:
                     smiles_left.extend([row.smiles] * row.stoich)
                 chebi_left.append(f"{row.stoich} {row.chebi_display}")
-                slm_id_left.append(f"{row.stoich} {row.iso_slm_id if row.iso_slm_id is not None else 'NA'}")
+                slm_id_left.append(f"{row.stoich} {row.iso_slm_id if pd.notna(row.iso_slm_id) else row.chebi_display}")
+                slm_name_left.append(f"{row.stoich} {row.iso_slm_name if pd.notna(row.iso_slm_name) else row.chebi_display}")
                 comp_left.append(row.comp_text)
 
             for row in right_participants:
                 if row.stoich > 0 and row.smiles:
                     smiles_right.extend([row.smiles] * row.stoich)
                 chebi_right.append(f"{row.stoich} {row.chebi_display}")
-                slm_id_right.append(f"{row.stoich} {row.iso_slm_id if row.iso_slm_id is not None else 'NA'}")
+                slm_id_right.append(f"{row.stoich} {row.iso_slm_id if pd.notna(row.iso_slm_id) else row.chebi_display}")
+                slm_name_right.append(f"{row.stoich} {row.iso_slm_name if pd.notna(row.iso_slm_name) else row.chebi_display}")
                 comp_right.append(row.comp_text)
 
             reaction_smiles     = '.'.join(smiles_left)     + '>>'  + '.'.join(smiles_right)
             chebi_equation      = ' + '.join(chebi_left)    + ' = ' + ' + '.join(chebi_right)
             slm_id_equation     = ' + '.join(slm_id_left)   + ' = ' + ' + '.join(slm_id_right)
+            slm_name_equation   = ' + '.join(slm_name_left) + ' = ' + ' + '.join(slm_name_right)
             components_equation = ' + '.join(comp_left)     + ' = ' + ' + '.join(comp_right)
-            return reaction_smiles, chebi_equation, slm_id_equation, components_equation
+            return reaction_smiles, chebi_equation, slm_id_equation, slm_name_equation, components_equation
 
         # --- Main section ---
         res_final:  List[Tuple[str, str, str, str]] = []
@@ -213,10 +219,11 @@ class RheaToSwisslipidsDf():
             smiles_pH = rec.get('SMILES (pH7.3)')
             smiles = smiles_pH if (smiles_pH is not None and pd.notna(smiles_pH)) else rec.get('smiles', '')
             iso_slm_id = rec.get('iso_slm_id')
+            iso_slm_name = rec.get('iso_slm_name')
             components = tuple(rec.get('components', []) or [])
             comp_counter = rec.get('comp_counter') or Counter(components)
             comp_text = str(rec.get('Components*'))
-            return Participant(chebi_id, chebi_display, side, stoich, smiles, iso_slm_id, components, comp_counter, comp_text)
+            return Participant(chebi_id, chebi_display, side, stoich, smiles, iso_slm_id, iso_slm_name, components, comp_counter, comp_text)
 
         # Helper function to group participants by their class.
         def __group_participants_by_class(df_participants: pd.DataFrame) -> List[List[Participant]]:
@@ -270,13 +277,14 @@ class RheaToSwisslipidsDf():
                 # Loop over the cartesian product of the participants in the left groups:
                 for left_combination in product(*left_groups):
                     # For each left combination, build the equations with the right combinations with pruning.
-                    res_total, component_match = self.__build_equations(left_combination, right_groups)
-                    for reaction_smiles, chebi_equation, slm_id_equation, components_equation in res_total:
+                    results_for_left_combination, component_match = self.__build_equations(left_combination, right_groups)
+                    for reaction_smiles, chebi_equation, slm_id_equation, slm_name_equation, components_equation in results_for_left_combination:
                         if reaction_smiles:
                             results.append({
                                 'MASTER_ID': master_id,
                                 'chebi_equation': chebi_equation,
                                 'slm_id_equation': slm_id_equation,
+                                'slm_name_equation': slm_name_equation,
                                 'components_equation': components_equation,
                                 'reaction_smiles': reaction_smiles,
                                 'component_match': component_match
