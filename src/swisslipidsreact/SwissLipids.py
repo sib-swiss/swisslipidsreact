@@ -31,7 +31,7 @@ class SwissLipids():
             self.swisslipids = pd.read_csv(f, sep="\t", encoding="latin-1",
                 usecols=['Name', 'Lipid ID', 'CHEBI', 'Level', 'Lipid class*', 'Components*', 'SMILES (pH7.3)'],
                 dtype={'Lipid ID': str, 'CHEBI': str, 'Level': str, 'Lipid class*': str,
-                    'Components*': str, 'SMILES (pH7.3)': str})
+                       'Components*': str, 'SMILES (pH7.3)': str})
 
         # assign level to be isomeric subspecies for all swisslipids that are not class lipids (compounds with *)
         self.swisslipids.loc[~self.swisslipids['SMILES (pH7.3)'].isna() & 
@@ -43,10 +43,10 @@ class SwissLipids():
         for variant in prime_variants:
             self.swisslipids['Components*'] = self.swisslipids['Components*'].str.replace(variant, "'", regex=False)
 
-        # Function to clean Components* column
-        def clean_components(row):
+        # Helper function to clean the Components* column
+        def __clean_components(row):
             """
-            remove class from the component
+            Removes class from the components
             """
             components = row['Components*']
             lipid_class = row['Lipid class*']
@@ -58,8 +58,8 @@ class SwissLipids():
             filtered = [comp.strip() for comp in components.split(' / ') if lipid_class not in comp]
             return ' / '.join(filtered) if filtered else None
 
-        # Apply clean_components function
-        self.swisslipids['Components*'] = self.swisslipids.apply(clean_components, axis=1)
+        # Apply __clean_components function
+        self.swisslipids['Components*'] = self.swisslipids.apply(__clean_components, axis=1)
 
         # Filter to retain only isomeric subspecies in a separate df
         self.get_isomeric_subspecies_table() # generates self.df_isomeric_subspecies
@@ -70,8 +70,8 @@ class SwissLipids():
         FA = "SLM:000000984"
         F_alcohol = "SLM:000390053"
 
-        FAs = self.get_lipid_to_descendant_df([FA])['Lipid ID'].to_list()
-        F_alcohols = self.get_lipid_to_descendant_df([F_alcohol])['Lipid ID'].to_list()
+        FAs = self.build_df_slm_class2iso([FA])['Lipid ID'].tolist()
+        F_alcohols = self.build_df_slm_class2iso([F_alcohol])['Lipid ID'].tolist()
         
         # Assign (free fatty acid) to Components* for FAs
         self.swisslipids.loc[self.swisslipids['Lipid ID'].isin(FAs), 'Components*'] = (
@@ -81,37 +81,37 @@ class SwissLipids():
         self.swisslipids.loc[self.swisslipids['Lipid ID'].isin(F_alcohols), 'Components*'] = (
         self.swisslipids['Lipid ID'] + ' (free fatty alcohol)' )
 
-        # helper to avoid repeating:
-        def load_package_tsv(module, filename, sep="\t"):
+        # Helper function for readability.
+        def __load_package_tsv(module, filename, sep="\t"):
             with importlib.resources.files(module).joinpath(filename).open("r") as f:
                 return pd.read_csv(f, sep=sep)
 
         # Now load the files:
-        df_facoa_to_ffa = load_package_tsv(
+        df_facoa_to_ffa = __load_package_tsv(
             "swisslipidsreact.package_data.components_correction", 
             "free fatty acids per compound.tsv"
         )
         comp_to_ffa_dict = dict(zip(df_facoa_to_ffa['Lipid ID'], df_facoa_to_ffa['free fatty acid']))
 
-        df_comp_to_nacyl_dict = load_package_tsv(
+        df_comp_to_nacyl_dict = __load_package_tsv(
             "swisslipidsreact.package_data.components_correction",
             "nacyls per compound.tsv"
         )
         comp_to_nacyl_dict = dict(zip(df_comp_to_nacyl_dict['Lipid ID'], df_comp_to_nacyl_dict['n-acyl']))
 
-        df_comp_to_sn1_dict = load_package_tsv(
+        df_comp_to_sn1_dict = __load_package_tsv(
             "swisslipidsreact.package_data.components_correction",
             "sn1 per compound.tsv"
         )
         comp_to_sn1_dict = dict(zip(df_comp_to_sn1_dict['Lipid ID'], df_comp_to_sn1_dict['sn1']))
 
-        df_comp_to_sn2_dict = load_package_tsv(
+        df_comp_to_sn2_dict = __load_package_tsv(
             "swisslipidsreact.package_data.components_correction",
             "sn2 per compound.tsv"
         )
         comp_to_sn2_dict = dict(zip(df_comp_to_sn2_dict['Lipid ID'], df_comp_to_sn2_dict['sn2']))
         
-        def assign_components(row, comp_to_ffa_dict, comp_to_nacyl_dict, comp_to_sn1_dict, comp_to_sn2_dict):
+        def __assign_components(row, comp_to_ffa_dict, comp_to_nacyl_dict, comp_to_sn1_dict, comp_to_sn2_dict):
             lipid_id = row['Lipid ID']
             nacyl_part = None
             acid_part = None
@@ -138,7 +138,7 @@ class SwissLipids():
             return row['Components*']
 
         # Assign values to Components* for CoAs
-        self.swisslipids['Components*'] = self.swisslipids.apply(assign_components, axis=1, args = [comp_to_ffa_dict, comp_to_nacyl_dict, comp_to_sn1_dict, comp_to_sn2_dict, ])
+        self.swisslipids['Components*'] = self.swisslipids.apply(__assign_components, axis=1, args = [comp_to_ffa_dict, comp_to_nacyl_dict, comp_to_sn1_dict, comp_to_sn2_dict, ])
 
         """
                 Class	Component 	Component 
@@ -208,7 +208,7 @@ class SwissLipids():
                 os.path.join(self.cache_dir, "lipids_preprocessed.tsv"), sep='\t', encoding='latin-1',
                 usecols=['Name', 'Lipid ID', 'CHEBI', 'Level', 'Lipid class*', 'Components*', 'SMILES (pH7.3)'],
                 dtype={'Lipid ID': str, 'CHEBI': str, 'Level': str, 'Lipid class*': str,
-                    'Components*': str, 'SMILES (pH7.3)': str}
+                       'Components*': str, 'SMILES (pH7.3)': str}
             )
 
             self.swisslipids.loc[~self.swisslipids['SMILES (pH7.3)'].isna() & 
@@ -272,16 +272,17 @@ class SwissLipids():
         self.get_lipid_class_graph()
     
     def get_lipid_class_graph(self):
-        # Build a directed graph of lipid class relationships
-        # Split multiple lipid classes into separate rows
+        """
+        Builds a directed graph of lipid class relationships.
+        """
+        # 'Lipid class*' may contain a pipe-separated list of values: Expand each value into a separate row.
         df_expanded = self.swisslipids.assign(
             **{'Lipid class*': self.swisslipids['Lipid class*'].str.split('|')}
         ).explode('Lipid class*')
-
-        # Optional: strip whitespace
+        # Strip extra whitespace (bug in lipids.tsv).
         df_expanded['Lipid class*'] = df_expanded['Lipid class*'].str.strip()
 
-        # Now build the graph
+        # Now build the graph.
         self.G_lipid_class = nx.from_pandas_edgelist(
             df_expanded, source='Lipid class*', target='Lipid ID', create_using=nx.DiGraph()
         )
@@ -291,7 +292,7 @@ class SwissLipids():
         """
         Creates df prefiltered to only have lipids specific for a particular positions / FA
         Columns:
-        ['rhea_lipid_id', 'isomeric_subspecies_descendant_lipid_id', 'Lipid ID',
+        ['class_slm_id', 'iso_slm_id', 'Lipid ID',
        'Level', 'Name', 'Lipid class*', 'Components*', 'SMILES (pH7.3)',
        'CHEBI', 'sn1'', 'sn2'', 'n-acyl', 'sn1', 'sn2', 'sn3',
        'free fatty acid', 'free fatty alcohol']
@@ -358,8 +359,8 @@ class SwissLipids():
                 print(f'No SLM ID found for {chebiid}')
                 continue
 
-            df_desc = self.get_lipid_to_descendant_df(SLM_classes)
-            all_lipids_considered.extend(df_desc['Lipid ID'].to_list())
+            df_desc = self.build_df_slm_class2iso(SLM_classes)
+            all_lipids_considered.extend(df_desc['Lipid ID'].tolist())
             if flag_print == True:
                 print('descendants before filtering', len(df_desc))
                 df_desc.to_csv('test.tsv', sep='\t',index=False)
@@ -385,8 +386,8 @@ class SwissLipids():
 
             if glycosphingolipid_slm in SLM_classes:
 
-                # Filter for rows where the rhea_lipid_id corresponds to glycosphingolipid descendants
-                descendants_df = df_desc[df_desc['rhea_lipid_id'] == glycosphingolipid_slm]
+                # Filter for rows where the class_slm_id corresponds to glycosphingolipid descendants
+                descendants_df = df_desc[df_desc['class_slm_id'] == glycosphingolipid_slm]
                 # Further filter where Name contains (d18:1(4E)/*)
                 df_desc = descendants_df[descendants_df['Name'].str.contains(r'\(d18:1\(4E\)/.+\)', regex=True)]
 
@@ -403,42 +404,48 @@ class SwissLipids():
         return final_df, all_lipids_considered
     
     # ---------- Lipid Class Graph Analysis ----------
-    def get_lipid_to_descendant_df(self, parent_SLMs):
+    def build_df_slm_class2iso(self, class_SLMs):
 
-        # Find descendants for each lipid in the Rhea-SwissLipids merged set
+        # Find the descendants of each provided class SLM.
         list_id_descendant = []
-        for lipid_id in set(parent_SLMs):
-            descendants = nx.descendants(self.G_lipid_class, lipid_id)
-            list_id_descendant.extend((lipid_id, i) for i in descendants)
+        for slm_id in set(class_SLMs):
+            descendants = nx.descendants(self.G_lipid_class, slm_id)
+            list_id_descendant.extend((slm_id, i) for i in descendants)
 
-        # Create dataframe of isomeric subspecies relationships
-        lipid_to_descendant_df = pd.DataFrame(list_id_descendant, columns=[
-            'rhea_lipid_id', 'isomeric_subspecies_descendant_lipid_id'
+        # Create dataframe of class to isomeric subspecies relationships.
+        df_slm_class2iso = pd.DataFrame(list_id_descendant, columns=[
+            'class_slm_id', 'iso_slm_id'
         ])
 
-        lipid_to_descendant_df = lipid_to_descendant_df.merge(
-            self.df_isomeric_subspecies, left_on='isomeric_subspecies_descendant_lipid_id',
+        df_slm_class2iso = df_slm_class2iso.merge(
+            self.df_isomeric_subspecies, left_on='iso_slm_id',
             right_on='Lipid ID', how='inner'
         )
-        return lipid_to_descendant_df
+        return df_slm_class2iso
     
-    def get_only_chebi_sl_df(self):
+    def build_df_slm2chebi(self):
         """
-        Extracts and processes CHEBI identifiers from the SwissLipids dataframe.
-        Returns a dataframe mapping 'Lipid ID' to individual numeric ChEBI IDs.
+        Builds a map of SLM IDs to numeric ChEBI IDs.
+        Deals with pipe-separated 'CHEBI' values and erroneous prefixes.
         """
-        df_chebi = self.swisslipids[['Lipid ID', 'CHEBI']].copy()
-        df_chebi.dropna(subset=['CHEBI'], inplace=True)
-        df_chebi['CHEBI'] = df_chebi['CHEBI'].astype(str).str.split('|')
-        df_chebi = df_chebi.explode('CHEBI')
-        df_chebi.dropna(subset=['CHEBI'], inplace=True)
-        df_chebi['chebi_id'] = df_chebi['CHEBI'].apply(lambda x: int(float(x.replace('CHEBI:', ''))) if isinstance(x, str) else int(x))
-        self.df_chebi = df_chebi
-        return df_chebi
+        df_slm2chebi = self.swisslipids[['Lipid ID', 'CHEBI']].copy()
+        df_slm2chebi.dropna(subset=['CHEBI'], inplace=True)
+        # 'CHEBI' may contain a pipe-separated list of values: Expand each value into a separate row.
+        # NB: There are only 3 rows: 2 are likely errors due to CHEBI merges, the 3rd is a "duplication":
+        # 74546 | 82922
+        # 82731 | CHEBI:82731
+        # 17336 | 83228
+        df_slm2chebi['CHEBI'] = df_slm2chebi['CHEBI'].astype(str).str.split('|')
+        df_slm2chebi = df_slm2chebi.explode('CHEBI')
+        df_slm2chebi.dropna(subset=['CHEBI'], inplace=True)
+        # Bug in lipids.tsv: There is one row with CHEBI:82731 instead of 82731.
+        df_slm2chebi['chebi_id'] = df_slm2chebi['CHEBI'].apply(lambda x: int(float(x.replace('CHEBI:', ''))) if isinstance(x, str) else int(x))
+        self.df_slm2chebi = df_slm2chebi
+        return df_slm2chebi
    
     def SLMs_from_CHEBIs(self, list_of_chebi_ids):
 
-        return self.df_chebi[self.df_chebi['chebi_id'].isin(list_of_chebi_ids)]['Lipid ID'].tolist()
+        return self.df_slm2chebi[self.df_slm2chebi['chebi_id'].isin(list_of_chebi_ids)]['Lipid ID'].tolist()
     
     def get_isomeric_subspecies_table(self):
         # Filter isomeric subspecies
