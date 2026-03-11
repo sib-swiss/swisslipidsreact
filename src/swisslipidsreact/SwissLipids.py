@@ -460,7 +460,7 @@ class SwissLipids():
         # Filter isomeric subspecies
         isomeric_subspecies = self.swisslipids[self.swisslipids['Level'] == 'Isomeric subspecies']
         self.df_isomeric_subspecies = isomeric_subspecies.copy()
-        logger.info( "LENGTH: %8d df_isomeric_subspecies", len(self.df_isomeric_subspecies))
+        logger.info( "LENGTH: %8d df_isomeric_subspecies", len(self.df_isomeric_subspecies) )
         logger.debug( "FORMAT: df_isomeric_subspecies\n%s", debug_df_first_row(self.df_isomeric_subspecies) )
         if DEBUG > 1:
             self.df_isomeric_subspecies.to_csv(os.path.join(self.output_dir, 'DEBUG_df_isomeric_subspecies.tsv'), sep="\t", header=True, index=False)

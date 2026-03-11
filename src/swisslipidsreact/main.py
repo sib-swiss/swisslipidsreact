@@ -39,7 +39,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     # Lipid ID | CHEBI | chebi_id
     # NB: 'CHEBI' is original value from lipids.tsv, 'chebi_id' has expanded pipe-separated 'CHEBI' values.
     df_slm2chebi = sl.build_df_slm2chebi()
-    logger.info( "LENGTH: %8d df_slm2chebi: %d", len(df_slm2chebi) )
+    logger.info( "LENGTH: %8d df_slm2chebi", len(df_slm2chebi) )
     logger.debug( "FORMAT: df_slm2chebi\n%s", debug_df_first_row(df_slm2chebi) )
     if DEBUG > 1:
         df_slm2chebi.to_csv(os.path.join(output_dir, 'DEBUG_df_slm2chebi.tsv'), sep="\t", header=True, index=False)
@@ -52,7 +52,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     # MASTER_ID | reaction_side | chebiid | smiles | inchi | inchikey | inchikey14L | stoich_coef
     # NB: 'chebiid' also contains POLYMER:x, but for GENERICs it contains the residues' CHEBI IDs.
     df_rhea2participants = rdb.rhea_reaction_long_format_smiles_chebi
-    logger.info( "LENGTH: %8d df_rhea2participants: %d", len(df_rhea2participants) )
+    logger.info( "LENGTH: %8d df_rhea2participants", len(df_rhea2participants) )
     logger.debug( "FORMAT: df_rhea2participants\n%s", debug_df_first_row(df_rhea2participants) )
     if DEBUG > 1:
         df_rhea2participants.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea2participants.tsv'), sep="\t", header=True, index=False)
@@ -62,7 +62,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     # df_rhea has one line per Rhea forward reaction:
     # MASTER_ID | reaction_participant_names | rheaid | rxnsmiles_no_residue_correction | chebi_equation | residue_rxn_flag | rxnsmiles | rxn_smiles_halogen | rxn_smiles_no_A_AH | class_reaction_flag | polymer_reaction_flag | RInChI | Web-RInChIKey
     df_rhea = rdb.df_reactions
-    logger.info( "LENGTH: %8d df_rhea: %d", len(df_rhea) )
+    logger.info( "LENGTH: %8d df_rhea", len(df_rhea) )
     logger.debug( "FORMAT: df_rhea\n%s", debug_df_first_row(df_rhea) )
     if DEBUG > 1:
         df_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea.tsv'), sep="\t", header=True, index=False)
@@ -133,7 +133,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     df_rhea2participants = df_rhea2participants[~df_rhea2participants['MASTER_ID'].isin(l_rhea_with_polymers)]
     df_rhea['2_after_filtering_out_the_polymers'] = df_rhea['MASTER_ID'].isin(df_rhea2participants['MASTER_ID'])
     
-    logger.info( "LENGTH: %8d df_rhea2participants: %d", len(df_rhea2participants) )
+    logger.info( "LENGTH: %8d df_rhea2participants", len(df_rhea2participants) )
     logger.debug( "FORMAT: df_rhea2participants\n%s", debug_df_first_row(df_rhea2participants) )
     if DEBUG > 1:
         df_rhea2participants.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea2participants2.tsv'), sep="\t", header=True, index=False)
@@ -143,7 +143,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     # df_rhea2participants2slm_class maps Rhea participants chebi_id to the corresponding SLM ID ('Lipid ID'):
     # MASTER_ID | reaction_side | chebiid | smiles | inchi | inchikey | inchikey14L | stoich_coef | id_prefix | chebi_id | Lipid ID | CHEBI
     r2sl.build_df_rhea2participants2slm_class(df_rhea2participants, df_slm2chebi)
-    logger.info( "LENGTH: %8d df_rhea2participants2slm_class: %d", len(r2sl.df_rhea2participants2slm_class) )
+    logger.info( "LENGTH: %8d df_rhea2participants2slm_class", len(r2sl.df_rhea2participants2slm_class) )
     logger.debug( "FORMAT: df_rhea2participants2slm_class\n%s", debug_df_first_row(r2sl.df_rhea2participants2slm_class) )
     if DEBUG > 1:
         r2sl.df_rhea2participants2slm_class.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea2participants2slm_class.tsv'), sep="\t", header=True, index=False)
@@ -177,7 +177,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
 
     logger.info( "Reading rhea_reactions_bond_changes.tsv" )
     df_bc = pd.read_csv(f_cache_rhea_reactions_bond_changes, sep='\t')
-    logger.info( "LENGTH: %8d df_bc: %d", len(df_bc) )
+    logger.info( "LENGTH: %8d df_bc", len(df_bc) )
     logger.debug( "FORMAT: df_bc: %s", debug_df_first_row(df_bc) )
     bond_changes_lookup = dict(zip(df_bc['MASTER_ID'], df_bc['bond_changes']))
 
@@ -185,7 +185,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     # class_slm_id | iso_slm_id | Lipid ID | Level | Name | Lipid class* | Components* | SMILES (pH7.3) | CHEBI | sn1' | sn2' | ...
     # NB: iso_slm_id = Lipid ID
     df_rhea_slm_class2iso = sl.build_df_slm_class2iso(SLMs_in_rhea)
-    logger.info( "LENGTH: %8d df_rhea_slm_class2iso: %d", len(df_rhea_slm_class2iso) )
+    logger.info( "LENGTH: %8d df_rhea_slm_class2iso", len(df_rhea_slm_class2iso) )
     logger.debug( "FORMAT: df_rhea_slm_class2iso\n%s", debug_df_first_row(df_rhea_slm_class2iso) )
     if DEBUG > 1:
         df_rhea_slm_class2iso.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_slm_class2iso.tsv'), sep="\t", header=True, index=False)
@@ -208,7 +208,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
         df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
     
     # FORMAT: df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
-    logger.info( "LENGTH: %8d df_rhea_slm_class2iso_filtered: %d", len(df_rhea_slm_class2iso_filtered) )
+    logger.info( "LENGTH: %8d df_rhea_slm_class2iso_filtered", len(df_rhea_slm_class2iso_filtered) )
     logger.debug( "FORMAT: df_rhea_slm_class2iso_filtered\n%s", debug_df_first_row(df_rhea_slm_class2iso_filtered) )
 
     df_rhea_slm_class2iso_temp = df_rhea_slm_class2iso[df_rhea_slm_class2iso['Lipid ID'].isin(df_rhea_slm_class2iso_filtered['Lipid ID'])]
