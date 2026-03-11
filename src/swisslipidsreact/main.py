@@ -218,8 +218,8 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     summary_lines.append(f'df_rhea_slm_class2iso\t{len(df_rhea_slm_class2iso)}')
     summary_lines.append(f'df_rhea_slm_class2iso unique iso_slm_id\t{len(set(df_rhea_slm_class2iso["iso_slm_id"]))}')
     
-    # Filter fatty acids.
     df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
+    # Filter fatty acids.
     if filter_fa == "curated":
         df_rhea_slm_class2iso_filtered, all_lipids_considered = sl.filter_fa_curated(test=test)
         summary_lines.append(f'df_rhea_slm_class2iso_filtered (biologically human-relevant)\t{len(df_rhea_slm_class2iso_filtered)}')
@@ -230,8 +230,6 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
             df_rhea_slm_class2iso_not_filtered.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_slm_class2iso_not_filtered.tsv'), sep="\t", header=True, index=False)
         # Add those lipids that were not in the list with positions.
         df_rhea_slm_class2iso_filtered = pd.concat([df_rhea_slm_class2iso_filtered, df_rhea_slm_class2iso_not_filtered])
-    elif filter_fa == "c16":
-        df_rhea_slm_class2iso_filtered = sl.filter_fa_c16(test=test)
         
     # FORMAT: df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
     logger.info( "LENGTH: %8d df_rhea_slm_class2iso_filtered", len(df_rhea_slm_class2iso_filtered) )
