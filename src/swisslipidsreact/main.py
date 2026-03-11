@@ -14,7 +14,7 @@ from .RheaToSwisslipidsDf import RheaToSwisslipidsDf
 
 logger = logging.getLogger(__name__)
 
-def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_restrictions=True, rheaid=None):
+def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_id=None, test=False):
 
     # determine the base directory
     if output_dir is None:
@@ -33,7 +33,7 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
 
     # Read SwissLipids files.
     sl = SwissLipids(output_dir=output_dir, timestamp=timestamp)
-    sl.read_swisslipids_from_file()
+    sl.read_swisslipids_from_file(filter_fa, test)
 
     # df_slm2chebi maps an SLM ID to a CHEBI ID:
     # Lipid ID | CHEBI | chebi_id
@@ -45,6 +45,25 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
         df_slm2chebi.to_csv(os.path.join(output_dir, 'DEBUG_df_slm2chebi.tsv'), sep="\t", header=True, index=False)
     summary_lines.append(f'df_slm2chebi\t{len(df_slm2chebi)}')
 
+    if filter_rhea == True:
+        # Get the unique SLM lipid classes of all isomeric subspecies.
+        df_iso_class = sl.get_isomeric_subspecies_class()
+        logger.info( "LENGTH: %8d df_iso_class", len(df_iso_class) )
+        logger.debug( "FORMAT: df_iso_class\n%s", debug_df_first_row(df_iso_class) )
+        if DEBUG > 1:
+            df_iso_class.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class.tsv'), sep="\t", header=True, index=False)
+
+        # Get the ChEBI ID for each SLM ID.
+        df_iso_class2chebi = df_iso_class.merge(df_slm2chebi, left_on='Lipid class*', right_on='Lipid ID', how='inner')
+        logger.info( "LENGTH: %8d df_iso_class2chebi", len(df_iso_class2chebi) )
+        logger.debug( "FORMAT: df_iso_class2chebi\n%s", debug_df_first_row(df_iso_class2chebi) )
+        if DEBUG > 1:
+            df_iso_class2chebi.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class2chebi.tsv'), sep="\t", header=True, index=False)
+
+        # Get the list of ChEBIs.
+        l_iso_class_chebi = df_iso_class2chebi['chebi_id'].tolist()
+        logger.info( "Statistics: %8d l_iso_class_chebi", len(l_iso_class_chebi ) )
+    
     # Read Rhea files.
     rdb = RheaDB()
     
@@ -52,12 +71,12 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     # MASTER_ID | reaction_side | chebiid | smiles | inchi | inchikey | inchikey14L | stoich_coef
     # NB: 'chebiid' also contains POLYMER:x, but for GENERICs it contains the residues' CHEBI IDs.
     df_rhea2participants = rdb.rhea_reaction_long_format_smiles_chebi
-    logger.info( "LENGTH: %8d df_rhea2participants", len(df_rhea2participants) )
+    logger.info( "LENGTH: %8d df_rhea2participants (unfiltered)", len(df_rhea2participants) )
     logger.debug( "FORMAT: df_rhea2participants\n%s", debug_df_first_row(df_rhea2participants) )
     if DEBUG > 1:
         df_rhea2participants.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea2participants.tsv'), sep="\t", header=True, index=False)
-    if rheaid:
-        df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID']==rheaid]
+    if rhea_id:
+        df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'] == rhea_id]
     
     # df_rhea has one line per Rhea forward reaction:
     # MASTER_ID | reaction_participant_names | rheaid | rxnsmiles_no_residue_correction | chebi_equation | residue_rxn_flag | rxnsmiles | rxn_smiles_halogen | rxn_smiles_no_A_AH | class_reaction_flag | polymer_reaction_flag | RInChI | Web-RInChIKey
@@ -132,12 +151,18 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
     l_rhea_with_polymers = df_rhea2participants.loc[df_rhea2participants['id_prefix'] == 'POLYMER', 'MASTER_ID'].tolist()
     df_rhea2participants = df_rhea2participants[~df_rhea2participants['MASTER_ID'].isin(l_rhea_with_polymers)]
     df_rhea['2_after_filtering_out_the_polymers'] = df_rhea['MASTER_ID'].isin(df_rhea2participants['MASTER_ID'])
-    
-    logger.info( "LENGTH: %8d df_rhea2participants", len(df_rhea2participants) )
-    logger.debug( "FORMAT: df_rhea2participants\n%s", debug_df_first_row(df_rhea2participants) )
-    if DEBUG > 1:
-        df_rhea2participants.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea2participants2.tsv'), sep="\t", header=True, index=False)
-    
+    logger.info( "LENGTH: %8d df_rhea2participants (filtered out reactions with Polymers)", len(df_rhea2participants) )
+
+    # Keep only reactions with at least one participant that was used as a class in the enumeration.
+    # NB: Can only do this here, because it needs clean column 'chebi_id'.
+    if filter_rhea == True:
+        l_rhea_used_in_enumeration = df_rhea2participants.loc[df_rhea2participants['chebi_id'].isin(l_iso_class_chebi), 'MASTER_ID'].unique().tolist()
+        logger.info( "Statistics: %8d l_rhea_used_in_enumeration", len(l_rhea_used_in_enumeration) )
+
+        df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
+        df_rhea['2.2_after_filtering_by_enumeration_classes'] = df_rhea['MASTER_ID'].isin(l_rhea_used_in_enumeration)
+        logger.info( "LENGTH: %8d df_rhea2participants (filtered by SLM used in enumeration)", len(df_rhea2participants) )
+        
     # Class RheaToSwissLipids merges Rhea and SwissLipids data.
     r2sl = RheaToSwisslipidsDf(output_dir=output_dir, timestamp=timestamp)
     # df_rhea2participants2slm_class maps Rhea participants chebi_id to the corresponding SLM ID ('Lipid ID'):
@@ -191,11 +216,12 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
         df_rhea_slm_class2iso.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_slm_class2iso.tsv'), sep="\t", header=True, index=False)
     summary_lines.append(f'r2sl.df_rhea2participants2slm_class\t{len(r2sl.df_rhea2participants2slm_class)}')
     summary_lines.append(f'df_rhea_slm_class2iso\t{len(df_rhea_slm_class2iso)}')
-    summary_lines.append(f'df_rhea_slm_class2iso unique Lipid ID isomeric subspecies\t{len(set(df_rhea_slm_class2iso["iso_slm_id"]))}')
+    summary_lines.append(f'df_rhea_slm_class2iso unique iso_slm_id\t{len(set(df_rhea_slm_class2iso["iso_slm_id"]))}')
     
     # Filter fatty acids.
-    if no_curated_list_restrictions == False:
-        df_rhea_slm_class2iso_filtered, all_lipids_considered = sl.filter_curated_biologically_relevant_isomeric_subspecies_only(curated_fa_list_run=curated_fa_list_run)
+    df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
+    if filter_fa == "curated":
+        df_rhea_slm_class2iso_filtered, all_lipids_considered = sl.filter_fa_curated(test=test)
         summary_lines.append(f'df_rhea_slm_class2iso_filtered (biologically human-relevant)\t{len(df_rhea_slm_class2iso_filtered)}')
         df_rhea_slm_class2iso_not_filtered = df_rhea_slm_class2iso[~df_rhea_slm_class2iso['Lipid ID'].isin(all_lipids_considered)]
         logger.info( "LENGTH: %8d df_rhea_slm_class2iso_filtered (curated)", len(df_rhea_slm_class2iso_filtered) )
@@ -204,16 +230,16 @@ def run_pipeline(curated_fa_list_run=True, output_dir=None, no_curated_list_rest
             df_rhea_slm_class2iso_not_filtered.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_slm_class2iso_not_filtered.tsv'), sep="\t", header=True, index=False)
         # Add those lipids that were not in the list with positions.
         df_rhea_slm_class2iso_filtered = pd.concat([df_rhea_slm_class2iso_filtered, df_rhea_slm_class2iso_not_filtered])
-    elif no_curated_list_restrictions == True:
-        df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
-    
+    elif filter_fa == "c16":
+        df_rhea_slm_class2iso_filtered = sl.filter_fa_c16(test=test)
+        
     # FORMAT: df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
     logger.info( "LENGTH: %8d df_rhea_slm_class2iso_filtered", len(df_rhea_slm_class2iso_filtered) )
     logger.debug( "FORMAT: df_rhea_slm_class2iso_filtered\n%s", debug_df_first_row(df_rhea_slm_class2iso_filtered) )
 
     df_rhea_slm_class2iso_temp = df_rhea_slm_class2iso[df_rhea_slm_class2iso['Lipid ID'].isin(df_rhea_slm_class2iso_filtered['Lipid ID'])]
     logger.info( "LENGTH: %8d df_rhea_slm_class2iso_temp", len(df_rhea_slm_class2iso_temp) )
-    
+
     Rhea_x_swisslipid_isomeric_subspecies, \
         Unique_swisslipid_isomeric_subspecies_in_Rhea, \
             = r2sl.build_df_rhea2participants2slm_class2iso(df_rhea_slm_class2iso_temp, sl.swisslipids)

@@ -21,7 +21,8 @@ class MasterIdAnalysis:
         self.output_dir = output_dir
         self.timestamp=timestamp
     
-    def run_master_id_analysis(self, results_overview_path='path/to/results.tsv', curated_fa_list_run=True, output_dir=None, no_curated_list_restrictions=True):
+    def run_master_id_analysis(self, results_overview_path='path/to/results.tsv', output_dir=None, filter_fa="curated", filter_rhea=False, test=False):
+        
         results_overview = pd.read_csv(results_overview_path, sep='\t')
         # determine the base directory
         if output_dir is None:
@@ -197,14 +198,13 @@ class MasterIdAnalysis:
         # Analyse the directed graph of SwissLipid ontology and get all isomeric subspecies per SLM in Rhea
         df_rhea_slm_class2iso = sl.build_df_slm_class2iso(SLMs_in_rhea)
         df_rhea_slm_class2iso.fillna('NA', inplace=True)
-        
+
         # Filter fatty acids.
-        if no_curated_list_restrictions == False:
+        df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
+        if filter_fa == "curated":
             print('CURATED')
-            df_rhea_slm_class2iso_filtered, _ = sl.filter_curated_biologically_relevant_isomeric_subspecies_only(curated_fa_list_run=curated_fa_list_run)
-            summary_lines.append(f'Total biologically human-relevant descendants of the class lipids identified in SwissLipids\t{len(df_rhea_slm_class2iso_filtered)}')
-        elif no_curated_list_restrictions == True:
-            df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
+            df_rhea_slm_class2iso_filtered, _ = sl.filter_fa_curated(test=test)
+            summary_lines.append(f'df_rhea_slm_class2iso_filtered (biologically human-relevant)\t{len(df_rhea_slm_class2iso_filtered)}')
         
         df_rhea_slm_class2iso_temp = df_rhea_slm_class2iso[df_rhea_slm_class2iso['Lipid ID'].isin(df_rhea_slm_class2iso_filtered['Lipid ID'])]
 

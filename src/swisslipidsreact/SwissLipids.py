@@ -66,10 +66,6 @@ class SwissLipids():
         # Apply __clean_components function
         self.swisslipids['Components*'] = self.swisslipids.apply(__clean_components, axis=1)
 
-        self.get_isomeric_subspecies_table() # generates self.df_isomeric_subspecies
-        
-        self.get_lipid_class_graph()
-
         # Assign free fatty acid as component for all FA and FA-CoA
         FA = "SLM:000000984"
         F_alcohol = "SLM:000390053"
@@ -199,7 +195,7 @@ class SwissLipids():
         self.swisslipids.to_csv(output_file, sep="\t", index=False)
     
     # ---------- Load SwissLipids Data ----------
-    def read_swisslipids_from_file(self):
+    def read_swisslipids_from_file(self, filter_fa="curated", test=False):
 
         # TODO: This is fast, does not need caching?
         # TODO: Remove hard-coded flag flag_fast_exec
@@ -209,6 +205,7 @@ class SwissLipids():
             self.pre_process_swisslipids(f_cache_lipids_preprocessed)
 
         # TODO: This is fast, does not need caching?
+        # TODO: Remove hard-coded flag flag_fast_exec
         lipids_components_split_cache_file = os.path.join(self.cache_dir, 'lipids_components_split.tsv')
         if not os.path.exists(lipids_components_split_cache_file) or flag_fast_exec==False:
             logger.info( "Extracting components into positions" )
@@ -218,10 +215,6 @@ class SwissLipids():
                 dtype={'Lipid ID': str, 'CHEBI': str, 'Level': str, 'Lipid class*': str,
                        'Components*': str, 'SMILES (pH7.3)': str}
             )
-
-            # TODO: This is duplicated in pre_process_swisslipids?
-            self.swisslipids.loc[~self.swisslipids['SMILES (pH7.3)'].isna() & 
-            self.swisslipids['Level'].isna() & ~self.swisslipids['SMILES (pH7.3)'].str.contains('*', regex=False, na=False), 'Level'] = 'Isomeric subspecies'
 
             # TODO: Ask Lucila what this is
             # malonyl-CoA(5−)	CHEBI:57384
@@ -274,10 +267,8 @@ class SwissLipids():
             logger.info( "Reading pre-processed SwissLipids file with components in positions" )
             self.swisslipids = pd.read_csv(lipids_components_split_cache_file, sep='\t', low_memory=False)
         
-        # Filter to retain only isomeric subspecies in a seeparate df
-        # TODO: This is duplicated in pre_process_swisslipids?
-        self.get_isomeric_subspecies_table() # generates self.df_isomeric_subspecies
-        
+        # Build a dataframe with only isomeric subspecies.
+        self.build_df_isomeric_subspecies(filter_fa, test)
         self.get_lipid_class_graph()
     
     def get_lipid_class_graph(self):
@@ -295,9 +286,8 @@ class SwissLipids():
         self.G_lipid_class = nx.from_pandas_edgelist(
             df_expanded, source='Lipid class*', target='Lipid ID', create_using=nx.DiGraph()
         )
-    
 
-    def filter_curated_biologically_relevant_isomeric_subspecies_only(self, curated_fa_list_run=True):
+    def filter_fa_curated(self, test=False):
         """
         Creates df prefiltered to only have lipids specific for a particular positions / FA
         Columns:
@@ -324,8 +314,8 @@ class SwissLipids():
         with importlib.resources.files("swisslipidsreact.package_data").joinpath("FA per class per position.tsv").open("r") as f:
             df = pd.read_csv(f, sep="\t")
 
-        # Adjust for only palmitic acid runs for the test palmitic runs 
-        if not curated_fa_list_run:
+        # Use only palmitic acid in test mode.
+        if test == True:
             for position in positions:
                 df.loc[df[position] == 'PAL_C16_OCT_C18', position] = 'PAL_C16'
                 df.loc[df[position] == 'FAS_85', position] = 'PAL_C16'
@@ -456,11 +446,81 @@ class SwissLipids():
 
         return self.df_slm2chebi[self.df_slm2chebi['chebi_id'].isin(list_of_chebi_ids)]['Lipid ID'].tolist()
     
-    def get_isomeric_subspecies_table(self):
-        # Filter isomeric subspecies
+    def get_isomeric_subspecies_class(self):
+        """
+        Extracts the unique lipid classes that were used for the enumeration of isomeric subspecies.
+        Returns a dataframe of unique 'Lipid class*'.
+        """
+        # 'Lipid class*' may contain a pipe-separated list of values: Expand each value into a separate row.
+        df_expanded = self.df_isomeric_subspecies.assign(
+            **{'Lipid class*': self.df_isomeric_subspecies['Lipid class*'].str.split('|')}
+        ).explode('Lipid class*')
+        # Strip extra whitespace (bug in lipids.tsv).
+        df_expanded['Lipid class*'] = df_expanded['Lipid class*'].str.strip()
+        
+        # NB: 'unique()' returns a NumPy array, which has no 'merge()' function.
+        # Use 'drop_duplicates()' to return a pandas Series, and convert it to a DataFrame.
+        return df_expanded['Lipid class*'].dropna().drop_duplicates().to_frame()
+
+
+    def build_df_isomeric_subspecies(self, filter_fa, test=False):
+        """
+        Builds self.df_isomeric_subspecies
+        """
         isomeric_subspecies = self.swisslipids[self.swisslipids['Level'] == 'Isomeric subspecies']
         self.df_isomeric_subspecies = isomeric_subspecies.copy()
         logger.info( "LENGTH: %8d df_isomeric_subspecies", len(self.df_isomeric_subspecies) )
+        
+        if filter_fa == "c16":
+            
+            # Filter isomeric subspecies by C16 rule.
+            PAL_C16   = "SLM:000000510" # CHEBI:7896  - fatty acid
+            PALOH_C16 = "SLM:000000202" # CHEBI:16125 - fatty alcohol (position sn1)
+
+            # Allow maximum 1 fatty acid that is not C16.
+            max_not_c16 = 1
+            if test == True:
+                # In test mode all fatty acids must be C16.
+                max_not_c16 = 0
+
+            # Format of lipids_components_split.tsv
+            # [0] - Lipid ID
+            # [1] - Level
+            # [2] - Name
+            # [3] - Lipid class*
+            # [4] - Components*
+            # [5] - SMILES (pH7.3)
+            # [6] - CHEBI
+            # [7] - sn1'
+            # [8] - sn2'
+            # [9] - n-acyl
+            # [10] - sn1
+            # [11] - sn2
+            # [12] - sn3
+            # [13] - acyl
+            # [14] - free fatty acid
+            # [15] - free fatty alcohol
+
+            # The lipid components are stored in the 'positions' columns (index 7-15).
+            # columns[7:16] means: start at index 7 and go up to but not including index 16.
+            df_positions = self.df_isomeric_subspecies.columns[7:16] # keeps the original names
+
+            # Remove the rows were all 'positions' columns are empty/undefined
+            # to keep only rows with at least one component.
+            df_components = self.df_isomeric_subspecies[~self.df_isomeric_subspecies[df_positions].replace("", pd.NA).isna().all(axis=1)]
+            logger.debug( "LENGTH: %8d df_isomeric_subspecies rows with components", len(df_components) )
+
+            # Flag cells in the 'positions' columns that are defined AND not equal to C16.
+            violations = df_components[df_positions].applymap(lambda x:
+                                                              isinstance(x, str) and
+                                                              x is not None and
+                                                              x != PAL_C16 and
+                                                              x != PALOH_C16)
+
+            # Keep only rows where the sum of the violations is <= max_not_c16
+            self.df_isomeric_subspecies = df_components[violations.sum(axis=1) <= max_not_c16].copy()
+            logger.info( "LENGTH: %8d df_isomeric_subspecies (after C16 filter)", len(self.df_isomeric_subspecies) )
+
         logger.debug( "FORMAT: df_isomeric_subspecies\n%s", debug_df_first_row(self.df_isomeric_subspecies) )
         if DEBUG > 1:
             self.df_isomeric_subspecies.to_csv(os.path.join(self.output_dir, 'DEBUG_df_isomeric_subspecies.tsv'), sep="\t", header=True, index=False)

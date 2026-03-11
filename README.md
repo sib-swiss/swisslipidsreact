@@ -39,10 +39,10 @@ To avoid downloading and preprocessing the full Rhea reaction data for every pot
 # Run enumeration
 swisslipidsreact run
 
-# Export .ttl (turtle) format for integration into the RDF knowledge graph.
+# Convert TSV to RDF format for integration into the RDF knowledge graph.
 swisslipidsreact export-ttl
 
-# Analyse rhea reaction template usage.
+# Analyse Rhea reaction template usage.
 swisslipidsreact master-id-analysis
 ```
 
@@ -50,45 +50,38 @@ swisslipidsreact master-id-analysis
 
 Explanation of fatty acid options:
   
-Option | Meaning | Runtime | Usage |
+Options | Meaning | Runtime | Usage |
 --- | --- | --- | --- |
-none (default) | Only palmitate allowed as a fatty acid in any position | minutes | Testing with reduced dataset |
---curated-fa | Filter SwissLipids based on allowed FA per position | hours | Filtered for integration in RDF knowledge grap |
--all-fa | all SwissLipids considered | ∞ | not recommended (too slow), but can be used for an individual Rhea ID |
+-filter-fa curated --test | Filter SwissLipids based on allowed FA per position, with only palmitate allowed as a FA in any position | minutes | Testing with reduced dataset |
+-filter-fa curated | Filter SwissLipids based on allowed FA per position | hours | Integration in RDF knowledge graph |
+-filter-fa none | Use all of SwissLipids | ∞ | Not recommended (too slow), but can be used for an individual Rhea ID |
 
 *Reaction enumeration*
 
   ```bash
 "--output-dir",
-type=str,
-default=None,
 help="Output directory (default: current working directory)"
 
-"--curated-fa",
-action="store_true",
-help="Use curated fatty acid list (default: False for C16)"
+"--rhea-id",
+help="Run pipeline only for the given Rhea ID"
 
-"--all-fa",
-action="store_true",
-default=False,
-help="No restrictions of FA per position"
+"--filter-fa",
+help = "Filter the fatty acids: curated (default), c16, none"
 
-"--rheaid",
-type=int,
-default=None,
-help="run pipeline for only one rhea id"
+"--filter-rhea",
+help = "Filter Rhea by the SLM classes of the isomeric subspecies (default: False)"
+
+"--test",
+help = "Test run with palmitic acid only (default: False)"
 ```
 
 *RDF export*
 
 ```bash
 "--curated-fa",
-action="store_true",
 help="Use curated fatty acid list for TTL export (default: False for C16)"
 
 "--input",
-type=str,
-default=None,
 help="Input TSV file (default: inferred from mode)"
 ```
 
@@ -99,38 +92,38 @@ To generate results for the whole list of fatty acids in human and enumerated cl
 
 To learn more about the options, check `swisslipidsreact --help`.
 
-* Enumerate with C16 fatty acids test set:
+* Enumerate with curated fatty acids (test set):
   ```bash
-  swisslipidsreact run --output-dir results_C16/
+  swisslipidsreact run --filter-fa curated --output-dir results-test-curated --test
   ```
 
-* Enumerate with curated list of fatty acids (execution time: several hours):
+* Enumerate with curated fatty acids (execution time: several hours):
   ```bash
-  swisslipidsreact run --curated-fa --output-dir results_curated_fatty_acids/
+  swisslipidsreact run --filter-fa curated --output-dir results-prod-curated
   ```
 
 * Enumerate with all fatty acids (WARNING: execution time: ∞):
   ```bash
-  swisslipidsreact run --all-fa --output-dir results_all_fatty_acids/
+  swisslipidsreact run --filter-fa none --output-dir results-prod
   ```
 
-* Enumerate with all fatty acids for one rhea id:
+* Enumerate with all fatty acids for one rhea ID:
   ```bash
-  swisslipidsreact run --all-fa --output-dir results_78071/ --rheaid 78071
+  swisslipidsreact run --filter-fa none --rhea-id 78071 --output-dir results-rhea-78071
   ```
 
-* Export RDF for C16 test set:
+* Export RDF for curated fatty acids (test set):
   ```bash
-  swisslipidsreact export-ttl --output-dir results_C16/
+  swisslipidsreact export-ttl --output-dir results-test-curated
   ```
-* Export RDF for curated list of fatty acids (execution time: several hours):
+* Export RDF for curated fatty acids (execution time: several hours):
   ```bash
-  swisslipidsreact export-ttl --curated-fa --output-dir results_curated_fatty_acids/
+  swisslipidsreact export-ttl --curated-fa --output-dir results-prod-curated
   ```
 
-* Analyse the Rhea reaction master id usage:
+* Analyse the Rhea reaction master ID usage:
   ```bash
-  swisslipidsreact master-id-analysis --input "results_merged/merged_enumerated_reactions.tsv" --all-fa
+  swisslipidsreact master-id-analysis --input "results_merged/merged_enumerated_reactions.tsv" --filter-fa curated
   ```
 
 ## Debugging
@@ -138,7 +131,7 @@ To learn more about the options, check `swisslipidsreact --help`.
 Use the environment variable SLR_DEBUG to get more detailed debug information, e.g.:
 
 ```bash
-SLR_DEBUG=1 swisslipidsreact run --output-dir results_C16
+SLR_DEBUG=1 swisslipidsreact run --filter-fa curated --output-dir results-test-curated --test
 ```
 
 * SLR_DEBUG=1 prints debug messages.
