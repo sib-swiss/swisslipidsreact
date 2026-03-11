@@ -33,10 +33,9 @@ class SwissLipids():
                 dtype={'Lipid ID': str, 'CHEBI': str, 'Level': str, 'Lipid class*': str,
                        'Components*': str, 'SMILES (pH7.3)': str})
 
-        # assign level to be isomeric subspecies for all swisslipids that are not class lipids (compounds with *)
+        # Assign level 'Isomeric subspecies' for all lipids that are not class lipids (compounds with *).
         self.swisslipids.loc[~self.swisslipids['SMILES (pH7.3)'].isna() & 
-        self.swisslipids['Level'].isna() & ~self.swisslipids['SMILES (pH7.3)'].str.contains('*', regex=False, na=False),
-        'Level'] = 'Isomeric subspecies'
+        self.swisslipids['Level'].isna() & ~self.swisslipids['SMILES (pH7.3)'].str.contains('*', regex=False, na=False), 'Level'] = 'Isomeric subspecies'
 
         # Normalize prime characters to ASCII apostrophe (')
         prime_variants = ['′', 'ʹ', '´']  # U+2032, U+02B9, U+00B4
@@ -54,14 +53,19 @@ class SwissLipids():
             if pd.isna(components):
                 return components  # Leave NaN as is
 
-            # Split and filter
+            # Split and filter.
+            ### TODO: "BUG" - 119 rows have multiple lipid_class, e.g. "SLM:000000261 | SLM:000056434"
+            ### -> There seem to be no cases in lipids.tsv, why is she doing this?
+            ### Lipid class* that matches Components* (estimation, not splitting the 119 cases of Lipid class* with '|' )
+            ### Ex: Isomeric subspecies	SLM:000000347	SLM:000001101 (sn1) / SLM:000001200 (sn2)
+            ### tail -n+2 lipids.tsv | perl -ne 'chomp; @a=split(/\t/); print "$a[1]\t$a[5]\t$a[7]\n" if $a[7] and ($a[5] =~ m|$a[7]|)' | wc -l
+            ### 0
             filtered = [comp.strip() for comp in components.split(' / ') if lipid_class not in comp]
             return ' / '.join(filtered) if filtered else None
 
         # Apply __clean_components function
         self.swisslipids['Components*'] = self.swisslipids.apply(__clean_components, axis=1)
 
-        # Filter to retain only isomeric subspecies in a separate df
         self.get_isomeric_subspecies_table() # generates self.df_isomeric_subspecies
         
         self.get_lipid_class_graph()
@@ -137,13 +141,16 @@ class SwissLipids():
                 return acid_part
             return row['Components*']
 
-        # Assign values to Components* for CoAs
+        # Assign values to Components* for CoAs.
+        # NB: This code adds components to lipids that were not enumerated by us, but that exist in ChEBI.
+        # TODO: This may not be 100% correct, we need to find a Rhea for it.
+        #       Alan thought the code just ignored the things we have not enumerated.
         self.swisslipids['Components*'] = self.swisslipids.apply(__assign_components, axis=1, args = [comp_to_ffa_dict, comp_to_nacyl_dict, comp_to_sn1_dict, comp_to_sn2_dict, ])
 
         """
                 Class	Component 	Component 
                             N-acyl	O-acyl
-		SLM:000389330	2-[(9Z)-octadecenoylamino]ethyl (9Z)-octadecenoate	SLM:000508875	SLM:000000418	SLM:000000418
+	SLM:000389330	2-[(9Z)-octadecenoylamino]ethyl (9Z)-octadecenoate	SLM:000508875	SLM:000000418	SLM:000000418
         SLM:000389331	2-[(5Z,8Z,11Z,14Z)-eicosatetraenoylamino]ethyl (9Z)-octadecenoate	SLM:000508875	SLM:000000296	SLM:000000418
         """
         self.swisslipids.loc[self.swisslipids['Lipid ID'] == 'SLM:000389330', 'Components*'] = 'SLM:000000418 (n-acyl) / SLM:000000418 (acyl)'
@@ -195,6 +202,7 @@ class SwissLipids():
     def read_swisslipids_from_file(self):
 
         # TODO: This is fast, does not need caching?
+        # TODO: Remove hard-coded flag flag_fast_exec
         f_cache_lipids_preprocessed = os.path.join(self.cache_dir, 'lipids_preprocessed.tsv')
         if not os.path.exists(os.path.join(f_cache_lipids_preprocessed)):
             logger.info( "Generating pre-processed SwissLipids file" )
@@ -211,9 +219,9 @@ class SwissLipids():
                        'Components*': str, 'SMILES (pH7.3)': str}
             )
 
+            # TODO: This is duplicated in pre_process_swisslipids?
             self.swisslipids.loc[~self.swisslipids['SMILES (pH7.3)'].isna() & 
-            self.swisslipids['Level'].isna() & ~self.swisslipids['SMILES (pH7.3)'].str.contains('*', regex=False, na=False),
-            'Level'] = 'Isomeric subspecies'
+            self.swisslipids['Level'].isna() & ~self.swisslipids['SMILES (pH7.3)'].str.contains('*', regex=False, na=False), 'Level'] = 'Isomeric subspecies'
 
             # TODO: Ask Lucila what this is
             # malonyl-CoA(5−)	CHEBI:57384
@@ -267,8 +275,9 @@ class SwissLipids():
             self.swisslipids = pd.read_csv(lipids_components_split_cache_file, sep='\t', low_memory=False)
         
         # Filter to retain only isomeric subspecies in a seeparate df
+        # TODO: This is duplicated in pre_process_swisslipids?
         self.get_isomeric_subspecies_table() # generates self.df_isomeric_subspecies
-            
+        
         self.get_lipid_class_graph()
     
     def get_lipid_class_graph(self):
@@ -451,7 +460,7 @@ class SwissLipids():
         # Filter isomeric subspecies
         isomeric_subspecies = self.swisslipids[self.swisslipids['Level'] == 'Isomeric subspecies']
         self.df_isomeric_subspecies = isomeric_subspecies.copy()
-        logger.info(  "LENGTH: df_isomeric_subspecies: %d", len(self.df_isomeric_subspecies))
+        logger.info( "LENGTH: %8d df_isomeric_subspecies", len(self.df_isomeric_subspecies))
         logger.debug( "FORMAT: df_isomeric_subspecies\n%s", debug_df_first_row(self.df_isomeric_subspecies) )
         if DEBUG > 1:
             self.df_isomeric_subspecies.to_csv(os.path.join(self.output_dir, 'DEBUG_df_isomeric_subspecies.tsv'), sep="\t", header=True, index=False)

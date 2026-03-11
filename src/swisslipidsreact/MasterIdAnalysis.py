@@ -197,7 +197,8 @@ class MasterIdAnalysis:
         # Analyse the directed graph of SwissLipid ontology and get all isomeric subspecies per SLM in Rhea
         df_rhea_slm_class2iso = sl.build_df_slm_class2iso(SLMs_in_rhea)
         df_rhea_slm_class2iso.fillna('NA', inplace=True)
-        # next df uses pos_descr_to_FA_list ->
+        
+        # Filter fatty acids.
         if no_curated_list_restrictions == False:
             print('CURATED')
             df_rhea_slm_class2iso_filtered, _ = sl.filter_curated_biologically_relevant_isomeric_subspecies_only(curated_fa_list_run=curated_fa_list_run)

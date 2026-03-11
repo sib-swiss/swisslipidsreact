@@ -60,15 +60,15 @@ class RheaToSwisslipidsDf():
     def build_df_rhea2participants2slm_class2iso(self, df_rhea_slm_class2iso, df_swisslipids):
 
         # FORMAT: df_rhea_slm_class2iso = same as in main.py
-        logger.info(  "LENGTH: df_rhea_slm_class2iso: %d", len(df_rhea_slm_class2iso) )
-        logger.info(  "LENGTH: df_swisslipids: %d", len(df_swisslipids) )
+        logger.info( "LENGTH: %8d df_rhea_slm_class2iso", len(df_rhea_slm_class2iso) )
+        logger.info( "LENGTH: %8d df_swisslipids", len(df_swisslipids) )
         logger.debug( "FORMAT: df_swisslipids\n%s", debug_df_first_row(df_swisslipids) )
 
         logger.debug( "LEFT merging self.df_rhea2participants2slm_class WITH df_rhea_slm_class2iso ON 'Lipid ID' = 'class_slm_id'" )
         df_rhea2participants2slm_class2iso = self.df_rhea2participants2slm_class.merge(
             df_rhea_slm_class2iso, left_on='Lipid ID', right_on='class_slm_id', how='left'
         )
-        logger.info(  "LENGTH: df_rhea2participants2slm_class2iso: %d", len(df_rhea2participants2slm_class2iso) )
+        logger.info( "LENGTH: %8d df_rhea2participants2slm_class2iso", len(df_rhea2participants2slm_class2iso) )
         logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
 
         logger.debug( "Selecting a subset of columns of df_rhea2participants2slm_class2iso and renaming some" )
@@ -81,12 +81,12 @@ class RheaToSwisslipidsDf():
         df_rhea2participants2slm_class2iso = df_rhea2participants2slm_class2iso.merge(
             df_swisslipids, left_on='iso_slm_id', right_on='Lipid ID', how='left'
         )
-        logger.info(  "LENGTH: df_rhea2participants2slm_class2iso: %d", len(df_rhea2participants2slm_class2iso) )
+        logger.info( "LENGTH: %8d df_rhea2participants2slm_class2iso", len(df_rhea2participants2slm_class2iso) )
         logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
         
         logger.debug( "Dropping 3 columns of df_rhea2participants2slm_class2iso: 'Lipid ID', 'Level', 'Lipid class*'" )
         df_rhea2participants2slm_class2iso.drop(columns=['Lipid ID', 'Level', 'Lipid class*'], inplace=True)
-        logger.info(  "LENGTH: df_rhea2participants2slm_class2iso: %d", len(df_rhea2participants2slm_class2iso) )
+        logger.info( "LENGTH: %8d df_rhea2participants2slm_class2iso", len(df_rhea2participants2slm_class2iso) )
         logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
 
         self.df_rhea2participants2slm_class2iso = df_rhea2participants2slm_class2iso
@@ -456,8 +456,8 @@ class RheaToSwisslipidsDf():
         # participants that map to an SLM. Before we can enumerate reactions, we
         # have to add back the Rhea participants that do not map to an SLM.
         df = self.df_rhea2participants2slm_class2iso
-        logger.info(  "LENGTH: df_rhea2participants: %d", len(df_rhea2participants) )
-        logger.info(  "LENGTH: df = self.df_rhea2participants2slm_class2iso: %d", len(df) )
+        logger.info( "LENGTH: %8d df_rhea2participants", len(df_rhea2participants) )
+        logger.info( "LENGTH: %8d df = self.df_rhea2participants2slm_class2iso", len(df) )
         logger.debug( "FORMAT: df\n%s", debug_df_first_row(df) )
         if DEBUG > 1:
             df.to_csv(os.path.join(self.output_dir, 'DEBUG_df.tsv'), sep="\t", header=True, index=False)
@@ -466,7 +466,7 @@ class RheaToSwisslipidsDf():
         df_rhea2participants_subset = df_rhea2participants[['MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'smiles']]
         # Get subset of df_rhea2participants rows whose MASTER_ID is in df (= r2sl.df_rhea2participants2slm_class2iso).
         df_rhea2participants_subset = df_rhea2participants_subset[df_rhea2participants_subset['MASTER_ID'].isin(df['MASTER_ID'])]
-        logger.info(  "LENGTH: df_rhea2participants_subset: %d", len(df_rhea2participants_subset) )
+        logger.info( "LENGTH: %8d df_rhea2participants_subset", len(df_rhea2participants_subset) )
         logger.debug( "FORMAT: df_rhea2participants_subset\n%s", debug_df_first_row(df_rhea2participants_subset) )
 
         # RIGHT merge df with df_rhea2participants_subset to add the CHEBIs from
@@ -475,13 +475,13 @@ class RheaToSwisslipidsDf():
         df = df.merge(
             df_rhea2participants_subset, on=['MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'smiles'], how='right'
         )
-        logger.info(  "LENGTH: df: %d", len(df) )
+        logger.info( "LENGTH: %8d df", len(df) )
         logger.debug( "FORMAT: df\n%s", debug_df_first_row(df) )
         if DEBUG > 0:
             df.to_csv(os.path.join(self.output_dir, 'DEBUG_df-after_merge.tsv'), sep="\t", header=True, index=False)
         
         df_result, total_enumeration_attempts = self.__enumerate_reactions(df)
-        logger.info( "Statistics: Reactions enumerated: %d\n", len(df_result) )
+        logger.info( "Statistics: %8d Reactions enumerated\n", len(df_result) )
         logger.debug( "FORMAT: df_result\n%s", debug_df_first_row(df_result) )
         if DEBUG > 1:
             df_result.to_csv(os.path.join(self.output_dir, 'DEBUG_df_result-reactions-enumerated.tsv'), sep="\t", header=True, index=False)
@@ -489,7 +489,7 @@ class RheaToSwisslipidsDf():
 
         # Drop rows without reaction SMILES.
         df_result.dropna(subset = ['reaction_smiles'], inplace=True)
-        logger.info( "Statistics: Reactions after dropping those without reaction SMILES: %d\n", len(df_result) )
+        logger.info( "Statistics: %8d Reactions after filtering those without reaction SMILES\n", len(df_result) )
         df_rhea['6_after_dropping_na_reaction_smiles'] = df_rhea['MASTER_ID'].isin(df_result['MASTER_ID'])
         MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced = len(set(df_result['MASTER_ID']))
         num_reactions_to_check_for_balance = len(df_result)
@@ -517,7 +517,7 @@ class RheaToSwisslipidsDf():
         df_result = pd.concat([df_result, df_change_of_sn_by_design])
         if DEBUG > 0:
             df_result.to_csv(os.path.join(self.output_dir, 'DEBUG_df_result-after-checking-components-balanced.tsv'), sep="\t", header=True, index=False)
-        logger.info( "Statistics: Reactions after filtering by component match: %d\n", len(df_result) )
+        logger.info( "Statistics: %8d Reactions after filtering unbalanced components\n", len(df_result) )
         df_rhea['7_after_dropping_incorrect_component_matches'] = df_rhea['MASTER_ID'].isin(df_result['MASTER_ID'])
 
         # Filter for balanced reactions
@@ -529,12 +529,12 @@ class RheaToSwisslipidsDf():
         MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced = len(set(df_result['MASTER_ID']))
         df_rhea['8_after_dropping_unbalanced_reactions'] = df_rhea['MASTER_ID'].isin(df_result['MASTER_ID'])
         num_reactions_after_filtering_out_the_unbalanced = len(df_result)
-        logger.info( "Statistics: Reactions after filtering by balance: %d\n", len(df_result) )
+        logger.info( "Statistics: %8d Reactions after filtering unbalanced reactions\n", len(df_result) )
         # Filter by bond changes
         logger.info( "progress_apply: Checking number of bond changes" )
         df_result['bond_breakage_max_4'] = df_result.progress_apply(__check_reactions_for_which_component_matching_was_impossible_with_atom_mapper, axis=1, args=[bond_changes_lookup,])
-        df_result = df_result[df_result['bond_breakage_max_4']==True]
-        logger.info( "Statistics: Reactions after filtering by bond changes: %d\n", len(df_result) )
+        df_result = df_result[df_result['bond_breakage_max_4'] == True]
+        logger.info( "Statistics: %8d Reactions after filtering bond changes\n", len(df_result) )
         df_rhea.to_csv(os.path.join(self.output_dir, f'{self.timestamp}_rhea_overview.tsv'), sep='\t', index=False)
 
         # Generate RInChI and Web-RInChIKey
@@ -549,7 +549,7 @@ class RheaToSwisslipidsDf():
             # Remove reactions without Web-RInChIKey (without structures) and duplicates
             df_result.dropna(subset=['Web-RInChIKey'], inplace=True)
             df_result.drop_duplicates(subset=['MASTER_ID', 'Web-RInChIKey', 'reaction_smiles'], inplace=True)
-            logger.info( "Statistics: Number of reactions after removing empty and duplicated by Web-RInChIKey: %d", len(df_result) )
+            logger.info( "Statistics: %8d Reactions after filtering empty and duplicated Web-RInChIKey", len(df_result) )
             
             # Save final result
             df_result.to_csv(os.path.join(self.output_dir, filename), sep='\t', index=False)
