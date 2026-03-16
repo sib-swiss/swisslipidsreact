@@ -14,7 +14,7 @@ from .RheaToSwisslipidsDf import RheaToSwisslipidsDf
 
 logger = logging.getLogger(__name__)
 
-def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_id=None, test=False):
+def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_id=None, rhea_version=None, test=False):
 
     # determine the base directory
     if output_dir is None:
@@ -64,8 +64,19 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         l_iso_class_chebi = df_iso_class2chebi['chebi_id'].tolist()
         logger.info( "Statistics: %8d l_iso_class_chebi", len(l_iso_class_chebi ) )
     
-    # Read Rhea files.
-    rdb = RheaDB()
+    # Read the Rhea FTP files.
+    rdb = RheaDB(rhea_version=rhea_version)
+    rhea_version = rdb.rhea_db_version
+    logger.info( "Loaded files of Rhea release %s", rhea_version )
+
+    # df_rhea has one line per Rhea forward reaction:
+    # MASTER_ID | reaction_participant_names | rheaid | rxnsmiles_no_residue_correction | chebi_equation | residue_rxn_flag | rxnsmiles | rxn_smiles_halogen | rxn_smiles_no_A_AH | class_reaction_flag | polymer_reaction_flag | RInChI | Web-RInChIKey
+    df_rhea = rdb.df_reactions
+    logger.info( "LENGTH: %8d df_rhea", len(df_rhea) )
+    logger.debug( "FORMAT: df_rhea\n%s", debug_df_first_row(df_rhea) )
+    if DEBUG > 1:
+        df_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea.tsv'), sep="\t", header=True, index=False)
+    logger.info( "Statistics: %8d Rhea IDs (unfiltered)", len(df_rhea) )
     
     # df_rhea2participants has one line per Rhea participant:
     # MASTER_ID | reaction_side | chebiid | smiles | inchi | inchikey | inchikey14L | stoich_coef
@@ -78,25 +89,19 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     if rhea_id:
         df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'] == rhea_id]
     
-    # df_rhea has one line per Rhea forward reaction:
-    # MASTER_ID | reaction_participant_names | rheaid | rxnsmiles_no_residue_correction | chebi_equation | residue_rxn_flag | rxnsmiles | rxn_smiles_halogen | rxn_smiles_no_A_AH | class_reaction_flag | polymer_reaction_flag | RInChI | Web-RInChIKey
-    df_rhea = rdb.df_reactions
-    logger.info( "LENGTH: %8d df_rhea", len(df_rhea) )
-    logger.debug( "FORMAT: df_rhea\n%s", debug_df_first_row(df_rhea) )
-    if DEBUG > 1:
-        df_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea.tsv'), sep="\t", header=True, index=False)
-
     # Get the subset of Rhea reactions with class compounds (compounds with R-groups).
     # To do this we must first remove reactions with Rhea generic compounds,
     # because like those with class compounds they have no Web-RInChIKey.
     df_rhea_without_generics  = df_rhea[df_rhea['residue_rxn_flag'] == False]
     df_rhea_without_rinchikey = df_rhea[df_rhea['Web-RInChIKey'].isna()]
     df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'].isin(df_rhea_without_generics['MASTER_ID'])]
-    logger.info( "LENGTH: %8d df_rhea2participants (filtered out reactions with generics)", len(df_rhea2participants) )
+    logger.info( "LENGTH: %8d df_rhea2participants (after filtering by generics)", len(df_rhea2participants) )
+    logger.info( "Statistics: %8d Rhea IDs (after filtering by generics)", len(df_rhea2participants['MASTER_ID'].unique()) )
     df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'].isin(df_rhea_without_rinchikey['MASTER_ID'])]
-    logger.info( "LENGTH: %8d df_rhea2participants (filtered out reactions without Web-RInChIKey)", len(df_rhea2participants) )
+    logger.info( "LENGTH: %8d df_rhea2participants (after filtering by Web-RInChIKey)", len(df_rhea2participants) )
+    logger.info( "Statistics: %8d Rhea IDs (after filtering by Web-RInChIKey)", len(df_rhea2participants['MASTER_ID'].unique()) )
     df_rhea = df_rhea.copy()
-    df_rhea['1_df_rhea'] = df_rhea['MASTER_ID'].isin(df_rhea2participants['MASTER_ID'])
+    df_rhea['1_after_filtering_generics_and_rinchikey'] = df_rhea['MASTER_ID'].isin(df_rhea2participants['MASTER_ID'])
     
     #### SWISS LIPIDS CORRECTIONS ####
     # In swisslipids ChEBI:58342 corresponds to Fatty acyl-CoAs, however, in
@@ -150,18 +155,20 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     # Remove reactions with polymers.
     l_rhea_with_polymers = df_rhea2participants.loc[df_rhea2participants['id_prefix'] == 'POLYMER', 'MASTER_ID'].tolist()
     df_rhea2participants = df_rhea2participants[~df_rhea2participants['MASTER_ID'].isin(l_rhea_with_polymers)]
-    df_rhea['2_after_filtering_out_the_polymers'] = df_rhea['MASTER_ID'].isin(df_rhea2participants['MASTER_ID'])
-    logger.info( "LENGTH: %8d df_rhea2participants (filtered out reactions with Polymers)", len(df_rhea2participants) )
-
+    logger.info( "LENGTH: %8d df_rhea2participants (after filtering by polymers)", len(df_rhea2participants) )
+    logger.info( "Statistics: %8d Rhea IDs (after filtering by polymers)", len(df_rhea2participants['MASTER_ID'].unique()) )
+    df_rhea['2.1_after_filtering_out_the_polymers'] = df_rhea['MASTER_ID'].isin(df_rhea2participants['MASTER_ID'])
+    
     # Keep only reactions with at least one participant that was used as a class in the enumeration.
-    # NB: Can only do this here, because it needs clean column 'chebi_id'.
+    # NB: We can only do this here, because it needs a clean column 'chebi_id'.
     if filter_rhea == True:
         l_rhea_used_in_enumeration = df_rhea2participants.loc[df_rhea2participants['chebi_id'].isin(l_iso_class_chebi), 'MASTER_ID'].unique().tolist()
         logger.info( "Statistics: %8d l_rhea_used_in_enumeration", len(l_rhea_used_in_enumeration) )
 
         df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
+        logger.info( "LENGTH: %8d df_rhea2participants (after filtering by SLM used in enumeration)", len(df_rhea2participants) )
+        logger.info( "Statistics: %6d Potential reaction (after filtering by SLM used in enumeration)", len(df_rhea2participants['MASTER_ID'].unique()) )
         df_rhea['2.2_after_filtering_by_enumeration_classes'] = df_rhea['MASTER_ID'].isin(l_rhea_used_in_enumeration)
-        logger.info( "LENGTH: %8d df_rhea2participants (filtered by SLM used in enumeration)", len(df_rhea2participants) )
         
     # Class RheaToSwissLipids merges Rhea and SwissLipids data.
     r2sl = RheaToSwisslipidsDf(output_dir=output_dir, timestamp=timestamp)
@@ -180,31 +187,30 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     summary_lines.append(f'Class reaction Rhea IDs without polymers (lipid + non-lipid)\t{len(MASTER_IDs)}')
 
     df_rhea['3_keeping_only_reactions_with_swisslipids'] = df_rhea['MASTER_ID'].isin(MASTER_IDs)
-    # TODO: What is this? It seems to be fixing some SMILES?
-    df_rhea['rxnsmiles_I'] = df_rhea['rxnsmiles'].apply(lambda x: x.replace('[1*]','C').replace('At','C').replace('[2*]','C').replace('*','C'))
 
-    def get_attention_guided_atom_map_error_wrap(mapped_rxn):
+   # Compute and cache the bond changes (we use them to filter the enumeration results).
+    # This takes app. 20min to compute, therefore we cache the result file in the rhea release folder.
+    def __get_attention_guided_atom_map_error_wrap(mapped_rxn):
         try:
             return r2sl.rxn_mapper.get_attention_guided_atom_maps([mapped_rxn])[0]['mapped_rxn']
         except:
             return '[C:1]>>[C:1]' # return dummy atom mapped equation that will return 0 bond changes
 
-    # CACHE: This takes app. 20min.
-    # Must be redone at each Rhea release and when we change the way we pre-process df_rhea.
-    # TODO: Move to rhea release folder, to recreate automatically at each release.
-    f_cache_rhea_reactions_bond_changes = os.path.join(sl.cache_dir, 'rhea_reactions_bond_changes.tsv')
-    if not os.path.exists(f_cache_rhea_reactions_bond_changes):
+    f_cache_rhea_bond_changes = os.path.join(rdb.rhea_db_version_location, "tsv/rhea-bond-changes-cache.tsv")
+    if not os.path.exists(f_cache_rhea_bond_changes):
+        logger.info( "Creating %s", f_cache_rhea_bond_changes )
         logger.info( "progress_apply: Generating rhea_reactions_bond_changes.tsv - Part 1" )
-        df_rhea['rxnsmiles_I_mapped'] = df_rhea['rxnsmiles_I'].progress_apply(lambda x: get_attention_guided_atom_map_error_wrap(x))
+        # TODO: What is this? It seems to be fixing some SMILES?
+        df_rhea['rxnsmiles_I'] = df_rhea['rxnsmiles'].apply(lambda x: x.replace('[1*]','C').replace('At','C').replace('[2*]','C').replace('*','C'))
+        df_rhea['rxnsmiles_I_mapped'] = df_rhea['rxnsmiles_I'].progress_apply(lambda x: __get_attention_guided_atom_map_error_wrap(x))
         logger.info( "progress_apply: Generating rhea_reactions_bond_changes.tsv - Part 2" )
         df_rhea['bond_changes'] = df_rhea['rxnsmiles_I_mapped'].progress_apply(lambda x: len(r2sl.mapped_reaction_to_report(x)['bond_changes']))
-        df_rhea.to_csv(f_cache_rhea_reactions_bond_changes, sep='\t', index=False)
-
-    logger.info( "Reading rhea_reactions_bond_changes.tsv" )
-    df_bc = pd.read_csv(f_cache_rhea_reactions_bond_changes, sep='\t')
-    logger.info( "LENGTH: %8d df_bc", len(df_bc) )
-    logger.debug( "FORMAT: df_bc: %s", debug_df_first_row(df_bc) )
-    bond_changes_lookup = dict(zip(df_bc['MASTER_ID'], df_bc['bond_changes']))
+        df_rhea.to_csv(f_cache_rhea_bond_changes, sep='\t', index=False)
+        
+    logger.info( "Reading %s", f_cache_rhea_bond_changes )
+    df_rhea_bond_changes = pd.read_csv(f_cache_rhea_bond_changes, sep='\t')
+    logger.info( "LENGTH: %8d df_rhea_bond_changes", len(df_rhea_bond_changes) )
+    dict_rhea2bond_changes = dict(zip(df_rhea_bond_changes['MASTER_ID'], df_rhea_bond_changes['bond_changes']))
 
     # df_rhea_slm_class2iso maps a Rhea class SLM ID to its isomeric subspecies SLM IDs:
     # class_slm_id | iso_slm_id | Lipid ID | Level | Name | Lipid class* | Components* | SMILES (pH7.3) | CHEBI | sn1' | sn2' | ...
@@ -242,14 +248,15 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         Unique_swisslipid_isomeric_subspecies_in_Rhea, \
             = r2sl.build_df_rhea2participants2slm_class2iso(df_rhea_slm_class2iso_temp, sl.swisslipids)
 
-    df_rhea['4_after_getting_df_descendants'] = df_rhea['MASTER_ID'].isin(r2sl.df_rhea2participants2slm_class2iso['MASTER_ID'])
+    logger.info( "Statistics: %8d Rhea IDs (after mapping class to iso)", len(r2sl.df_rhea2participants2slm_class2iso['MASTER_ID'].unique()) )
+    df_rhea['4_after_mapping_class2iso'] = df_rhea['MASTER_ID'].isin(r2sl.df_rhea2participants2slm_class2iso['MASTER_ID'])
 
     # Function save_results generated the combinations and saves the results
     total_gen_attempted, \
     MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced, \
     num_reactions_to_check_for_balance, \
     MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced, \
-    num_reactions_after_filtering_out_the_unbalanced = r2sl.save_results(df_rhea2participants, df_rhea, f'{timestamp}_enumerated_reactions.tsv', bond_changes_lookup)
+    num_reactions_after_filtering_out_the_unbalanced = r2sl.save_results(df_rhea2participants, df_rhea, f'{timestamp}_enumerated_reactions.tsv', dict_rhea2bond_changes)
 
     stats_dict = {
         'Rhea_x_swisslipid_isomeric_subspecies':  Rhea_x_swisslipid_isomeric_subspecies, 

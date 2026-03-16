@@ -21,7 +21,7 @@ class MasterIdAnalysis:
         self.output_dir = output_dir
         self.timestamp=timestamp
     
-    def run_master_id_analysis(self, results_overview_path='path/to/results.tsv', output_dir=None, filter_fa="curated", filter_rhea=False, test=False):
+    def run_master_id_analysis(self, results_overview_path='path/to/results.tsv', output_dir=None, filter_fa="curated", filter_rhea=False, rhea_version=None, test=False):
         
         results_overview = pd.read_csv(results_overview_path, sep='\t')
         # determine the base directory
@@ -54,8 +54,10 @@ class MasterIdAnalysis:
         print('Unique SL IDs with ChEBI:', len(df_slm2chebi['Lipid ID'].unique()))
 
         # Read Rhea files.
-        rdb = RheaDB()
-
+        rdb = RheaDB(rhea_version=rhea_version)
+        rhea_version = rdb.rhea_db_version
+        logger.info( "Loaded files of Rhea release %s", rhea_version )
+ 
         # df_rhea2participants has one line per Rhea participant:
         # MASTER_ID | reaction_side | chebiid | smiles | inchi | inchikey | inchikey14L | stoich_coef
         # NB: 'chebiid' also contains POLYMER:x, but for GENERICs it contains the residues' CHEBI IDs.

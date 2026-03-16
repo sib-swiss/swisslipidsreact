@@ -62,14 +62,17 @@ Options | Meaning | Runtime | Usage |
 "--output-dir",
 help="Output directory (default: current working directory)"
 
-"--rhea-id",
-help="Run pipeline only for the given Rhea ID"
-
 "--filter-fa",
 help = "Filter the fatty acids: curated (default), c16, none"
 
 "--filter-rhea",
 help = "Filter Rhea by the SLM classes of the isomeric subspecies (default: False)"
+
+"--rhea-id",
+help="Run pipeline only for the given Rhea ID"
+
+"--rhea-version",
+help = "Use the given Rhea release version (default: latest release)"
 
 "--test",
 help = "Test run with palmitic acid only (default: False)"

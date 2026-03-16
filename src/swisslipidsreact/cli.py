@@ -33,12 +33,6 @@ def main():
         help = "Output directory (default: current working directory)"
     )
     parser_run.add_argument(
-        "--rhea-id",
-        type = int,
-        default = None,
-        help = "Run pipeline only for the given Rhea ID"
-    )
-    parser_run.add_argument(
         "--filter-fa",
         type = str,
         choices = ["curated", "c16", "none"],
@@ -49,6 +43,18 @@ def main():
         "--filter-rhea",
         action = "store_true",
         help = "Filter Rhea by the SLM classes of the isomeric subspecies (default: False)"
+    )
+    parser_run.add_argument(
+        "--rhea-id",
+        type = int,
+        default = None,
+        help = "Run pipeline only for the given Rhea ID"
+    )
+    parser_run.add_argument(
+        "--rhea-version",
+        type = int,
+        default = None,
+        help = "Use the given Rhea release version (default: latest release)"
     )
     parser_run.add_argument(
         "--test",
@@ -109,6 +115,12 @@ def main():
         help = "Filter Rhea by the SLM classes of the isomeric subspecies (default: False)"
     )
     parser_master_id_analysis.add_argument(
+        "--rhea-version",
+        type = int,
+        default = None,
+        help = "Use the given Rhea release version (default: latest release)"
+    )
+    parser_master_id_analysis.add_argument(
         "--test",
         action = "store_true",
         help = "Test run with palmitic acid only (default: False)"
@@ -122,6 +134,7 @@ def main():
             filter_fa = args.filter_fa,
             filter_rhea = args.filter_rhea,
             rhea_id = args.rhea_id,
+            rhea_version = args.rhea_version,
             test = args.test
         )
     elif args.command == "export-ttl":
@@ -141,5 +154,6 @@ def main():
             output_dir = args.output_dir,
             filter_fa = args.filter_fa,
             filter_rhea = args.filter_rhea,
+            rhea_version = args.rhea_version,
             test = args.test
-            )
+        )
