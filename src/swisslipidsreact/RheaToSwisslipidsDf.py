@@ -53,8 +53,8 @@ class RheaToSwisslipidsDf():
         self.output_dir = output_dir
         self.timestamp  = timestamp
 
-    def build_df_rhea2participants2slm_class(self, df_rhea2participants, df_slm2chebi):
-        self.df_rhea2participants2slm_class = df_rhea2participants.merge(df_slm2chebi, on='chebi_id', how='inner')
+    def build_df_rhea2participants2slm(self, df_rhea2participants, df_slm2chebi):
+        self.df_rhea2participants2slm = df_rhea2participants.merge(df_slm2chebi, on='chebi_id', how='inner')
 
     # --- Merge to obtain Rhea reactions of isomeric subspecies ---
     def build_df_rhea2participants2slm_class2iso(self, df_rhea_slm_class2iso, df_swisslipids):
@@ -64,8 +64,8 @@ class RheaToSwisslipidsDf():
         logger.info( "LENGTH: %8d df_swisslipids", len(df_swisslipids) )
         logger.debug( "FORMAT: df_swisslipids\n%s", debug_df_first_row(df_swisslipids) )
 
-        logger.debug( "LEFT merging self.df_rhea2participants2slm_class WITH df_rhea_slm_class2iso ON 'Lipid ID' = 'class_slm_id'" )
-        df_rhea2participants2slm_class2iso = self.df_rhea2participants2slm_class.merge(
+        logger.debug( "LEFT merging self.df_rhea2participants2slm WITH df_rhea_slm_class2iso ON 'Lipid ID' = 'class_slm_id'" )
+        df_rhea2participants2slm_class2iso = self.df_rhea2participants2slm.merge(
             df_rhea_slm_class2iso, left_on='Lipid ID', right_on='class_slm_id', how='left'
         )
         logger.info( "LENGTH: %8d df_rhea2participants2slm_class2iso", len(df_rhea2participants2slm_class2iso) )
@@ -89,8 +89,7 @@ class RheaToSwisslipidsDf():
         logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
 
         self.df_rhea2participants2slm_class2iso = df_rhea2participants2slm_class2iso
-        return len(df_rhea2participants2slm_class2iso), len(set(df_rhea2participants2slm_class2iso['iso_slm_id']))
-
+ 
 
     # --- Reaction generation functions ---
     def __build_equations(self, left_combination: Iterable[Participant], right_groups: List[List[Participant]]):
@@ -250,7 +249,6 @@ class RheaToSwisslipidsDf():
         df_left  = df[df['side'] == 'L']
         df_right = df[df['side'] == 'R']
 
-        total_gen_attempted = len(df_left['reaction_side'].unique())
         results = []
         
         logger.info("progress_apply: Enumerating reactions")
@@ -295,7 +293,7 @@ class RheaToSwisslipidsDf():
             finally:
                 signal.alarm(0) # Cancel alarm.
 
-        return pd.DataFrame(results), total_gen_attempted
+        return pd.DataFrame(results)
 
 
     def mapped_reaction_to_report(self, mapped_rxn):
@@ -479,7 +477,7 @@ class RheaToSwisslipidsDf():
         if DEBUG > 0:
             df.to_csv(os.path.join(self.output_dir, 'DEBUG_df-after_merge.tsv'), sep="\t", header=True, index=False)
         
-        df_result, total_enumeration_attempts = self.__enumerate_reactions(df)
+        df_result = self.__enumerate_reactions(df)
         stats["reactions"].append( "%8d Reactions enumerated\n" % len(df_result) )
         stats["rhea"].append( "%8d Rhea IDs (in enumerated reactions)\n" % len(df_result['MASTER_ID'].unique()) )
         if DEBUG > 1:
@@ -490,8 +488,6 @@ class RheaToSwisslipidsDf():
         df_result.dropna(subset = ['reaction_smiles'], inplace=True)
         stats["reactions"].append( "%8d Reactions enumerated (after filtering those without reaction SMILES)\n" % len(df_result) )
         stats["rhea"].append( "%8d Rhea IDs (after filtering those without reaction SMILES)\n" % len(df_result['MASTER_ID'].unique()) )
-        MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced = len(set(df_result['MASTER_ID']))
-        num_reactions_to_check_for_balance = len(df_result)
         
         logger.info( "progress_apply: Checking components balanced" )
         # Example input rows:
@@ -525,8 +521,6 @@ class RheaToSwisslipidsDf():
         df_result['balanced'] = df_result['reaction_smiles'].progress_apply(rxn.check_reaction_balance)
         df_result = df_result[df_result['balanced'] == True]
         df_result.drop(columns=['balanced'], inplace=True)
-        MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced = len(set(df_result['MASTER_ID']))
-        num_reactions_after_filtering_out_the_unbalanced = len(df_result)
         stats["reactions"].append( "%8d Reactions enumerated (after filtering unbalanced reactions)\n" % len(df_result) )
         stats["rhea"].append( "%8d Rhea IDs (after filtering unbalanced reactions)\n" % len(df_result['MASTER_ID'].unique()) )
         
@@ -554,9 +548,3 @@ class RheaToSwisslipidsDf():
 
             # Save final result.
             df_result.to_csv(os.path.join(self.output_dir, filename), sep='\t', index=False)
-
-        return total_enumeration_attempts, \
-            MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced, \
-            num_reactions_to_check_for_balance, \
-            MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced, \
-            num_reactions_after_filtering_out_the_unbalanced

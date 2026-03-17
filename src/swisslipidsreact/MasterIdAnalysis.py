@@ -131,41 +131,41 @@ class MasterIdAnalysis:
         print('Unique Rhea chebi ids from class reactions without polymers, residues', len(df_rhea2participants['chebi_id'].unique()))
         
         # Class RheaToSwissLipids merges Rhea and SwissLipids data.
-        # df_rhea2participants2slm_class has one line per Rhea participant:
+        # df_rhea2participants2slm has one line per Rhea participant:
         # MASTER_ID | reaction_side | chebiid | smiles | inchi | inchikey | inchikey14L | stoich_coef | id_prefix | chebi_id | Lipid ID | CHEBI
         # NB: rhea.chebi_id = sl.chebi_id -> Lipid ID = SLM ID of rhea.chebi_id
-        r2sl.build_df_rhea2participants2slm_class(df_rhea2participants, df_slm2chebi)
+        r2sl.build_df_rhea2participants2slm(df_rhea2participants, df_slm2chebi)
 
         # Step 1: Identify common columns for comparison
-        common_cols = list(set(r2sl.df_rhea2participants2slm_class.columns) & set(df_rhea2participants.columns))
+        common_cols = list(set(r2sl.df_rhea2participants2slm.columns) & set(df_rhea2participants.columns))
 
-        # Step 2: Find rows in df_rhea2participants that are NOT in r2sl.df_rhea2participants2slm_class
+        # Step 2: Find rows in df_rhea2participants that are NOT in r2sl.df_rhea2participants2slm
         new_rows = df_rhea2participants.merge(
-            r2sl.df_rhea2participants2slm_class[common_cols],
+            r2sl.df_rhea2participants2slm[common_cols],
             on=common_cols,
             how='left',
             indicator=True
         ).query('_merge == "left_only"').drop(columns=['_merge'])
 
-        # Step 3: Append the new rows to r2sl.df_rhea2participants2slm_class
-        r2sl.df_rhea2participants2slm_class = pd.concat([r2sl.df_rhea2participants2slm_class, new_rows], ignore_index=True)
+        # Step 3: Append the new rows to r2sl.df_rhea2participants2slm
+        r2sl.df_rhea2participants2slm = pd.concat([r2sl.df_rhea2participants2slm, new_rows], ignore_index=True)
         
-        SLMs_in_rhea = r2sl.df_rhea2participants2slm_class['Lipid ID'].unique()
+        SLMs_in_rhea = r2sl.df_rhea2participants2slm['Lipid ID'].unique()
         print('Unique SLMs in Rhea:', len(SLMs_in_rhea))
 
-        print('Total unique MASTER_ID:',     len(r2sl.df_rhea2participants2slm_class['MASTER_ID'].unique()))
-        print('Total unique chebi id:',      len(r2sl.df_rhea2participants2slm_class['chebi_id'].unique()))
-        print('Total unique rhea lipid id:', len(r2sl.df_rhea2participants2slm_class['Lipid ID'].unique()))
+        print('Total unique MASTER_ID:',     len(r2sl.df_rhea2participants2slm['MASTER_ID'].unique()))
+        print('Total unique chebi id:',      len(r2sl.df_rhea2participants2slm['chebi_id'].unique()))
+        print('Total unique rhea lipid id:', len(r2sl.df_rhea2participants2slm['Lipid ID'].unique()))
 
         print()
-        master_ids_with_a_swisslipid = r2sl.df_rhea2participants2slm_class[r2sl.df_rhea2participants2slm_class['Lipid ID'].notna()]['MASTER_ID'].unique()
-        df_master_ids_with_a_swisslipid = r2sl.df_rhea2participants2slm_class[r2sl.df_rhea2participants2slm_class['MASTER_ID'].isin(master_ids_with_a_swisslipid)]
+        master_ids_with_a_swisslipid = r2sl.df_rhea2participants2slm[r2sl.df_rhea2participants2slm['Lipid ID'].notna()]['MASTER_ID'].unique()
+        df_master_ids_with_a_swisslipid = r2sl.df_rhea2participants2slm[r2sl.df_rhea2participants2slm['MASTER_ID'].isin(master_ids_with_a_swisslipid)]
         print('With SwissLipid unique MASTER_ID:', len(df_master_ids_with_a_swisslipid['MASTER_ID'].unique()))
         # print('With SwissLipid unique chebi id:', len(df_master_ids_with_a_swisslipid['chebi_id'].unique()))
         print('With SwissLipid unique rhea lipid id:', len(df_master_ids_with_a_swisslipid['Lipid ID'].unique()))
 
         print()
-        master_ids_without_a_swisslipid = r2sl.df_rhea2participants2slm_class[~r2sl.df_rhea2participants2slm_class['MASTER_ID'].isin(master_ids_with_a_swisslipid)]['MASTER_ID'].unique()
+        master_ids_without_a_swisslipid = r2sl.df_rhea2participants2slm[~r2sl.df_rhea2participants2slm['MASTER_ID'].isin(master_ids_with_a_swisslipid)]['MASTER_ID'].unique()
         print('master_ids_without_a_swisslipid', len(master_ids_without_a_swisslipid))
         print('Example master_ids_without_a_swisslipid', random.sample(master_ids_without_a_swisslipid.tolist(), 3))
 
