@@ -32,9 +32,6 @@ class MasterIdAnalysis:
 
         # ---------- Load and Process RheaDB Data ----------
 
-        # Top summary lines
-        summary_lines = []
-
         # Read SwissLipids files.
         sl = SwissLipids(output_dir=output_dir)
         sl.read_swisslipids_from_file()
@@ -49,7 +46,6 @@ class MasterIdAnalysis:
         # NB: 'CHEBI' is original value from lipids.tsv, 'chebi_id' has expanded pipe-separated 'CHEBI' values.
         df_slm2chebi = sl.build_df_slm2chebi()
 
-        summary_lines.append(f'# swiss lipids * chebi\t{len(df_slm2chebi)}')
         print('Unique ChEBI IDs in SwissLipids:', len(df_slm2chebi['CHEBI'].unique()))
         print('Unique SL IDs with ChEBI:', len(df_slm2chebi['Lipid ID'].unique()))
 
@@ -206,7 +202,6 @@ class MasterIdAnalysis:
         if filter_fa == "curated":
             print('CURATED')
             df_rhea_slm_class2iso_filtered, _ = sl.filter_fa_curated(test=test)
-            summary_lines.append(f'df_rhea_slm_class2iso_filtered (biologically human-relevant)\t{len(df_rhea_slm_class2iso_filtered)}')
         
         df_rhea_slm_class2iso_temp = df_rhea_slm_class2iso[df_rhea_slm_class2iso['Lipid ID'].isin(df_rhea_slm_class2iso_filtered['Lipid ID'])]
 

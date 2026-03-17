@@ -86,7 +86,6 @@ class RheaToSwisslipidsDf():
         
         logger.debug( "Dropping 3 columns of df_rhea2participants2slm_class2iso: 'Lipid ID', 'Level', 'Lipid class*'" )
         df_rhea2participants2slm_class2iso.drop(columns=['Lipid ID', 'Level', 'Lipid class*'], inplace=True)
-        logger.info( "LENGTH: %8d df_rhea2participants2slm_class2iso", len(df_rhea2participants2slm_class2iso) )
         logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
 
         self.df_rhea2participants2slm_class2iso = df_rhea2participants2slm_class2iso
@@ -366,7 +365,7 @@ class RheaToSwisslipidsDf():
         return report
 
     # ---------- Generate, Filter, and Save Final Results ----------
-    def save_results(self, df_rhea2participants, df_rhea, filename, dict_rhea2bond_changes):
+    def save_results(self, df_rhea2participants, filename, dict_rhea2bond_changes, stats):
 
         # Helper function
         def __get_position2component_map(components_equation_side: str) -> dict[str, str]:
@@ -481,47 +480,44 @@ class RheaToSwisslipidsDf():
             df.to_csv(os.path.join(self.output_dir, 'DEBUG_df-after_merge.tsv'), sep="\t", header=True, index=False)
         
         df_result, total_enumeration_attempts = self.__enumerate_reactions(df)
-        logger.info( "Statistics: %8d Reactions enumerated\n", len(df_result) )
-        logger.debug( "FORMAT: df_result\n%s", debug_df_first_row(df_result) )
+        stats["reactions"].append( "%8d Reactions enumerated\n" % len(df_result) )
+        stats["rhea"].append( "%8d Rhea IDs (in enumerated reactions)\n" % len(df_result['MASTER_ID'].unique()) )
         if DEBUG > 1:
+            logger.debug( "FORMAT: df_result\n%s", debug_df_first_row(df_result) )
             df_result.to_csv(os.path.join(self.output_dir, 'DEBUG_df_result-reactions-enumerated.tsv'), sep="\t", header=True, index=False)
-        logger.info( "Statistics: %8d Rhea IDs (after enumerating reactions)", len(df_result['MASTER_ID'].unique()) )
-        df_rhea['5_after_enumerating_reactions'] = df_rhea['MASTER_ID'].isin(df_result['MASTER_ID'])
 
         # Drop rows without reaction SMILES.
         df_result.dropna(subset = ['reaction_smiles'], inplace=True)
-        logger.info( "Statistics: %8d Reactions (after filtering those without reaction SMILES)\n", len(df_result) )
-        logger.info( "Statistics: %8d Rhea IDs (after filtering those without reaction SMILES)", len(df_result['MASTER_ID'].unique()) )
-        df_rhea['6_after_dropping_na_reaction_smiles'] = df_rhea['MASTER_ID'].isin(df_result['MASTER_ID'])
+        stats["reactions"].append( "%8d Reactions enumerated (after filtering those without reaction SMILES)\n" % len(df_result) )
+        stats["rhea"].append( "%8d Rhea IDs (after filtering those without reaction SMILES)\n" % len(df_result['MASTER_ID'].unique()) )
         MASTER_ID_for_specific_fatty_acids_before_filtering_out_the_unbalanced = len(set(df_result['MASTER_ID']))
         num_reactions_to_check_for_balance = len(df_result)
         
         logger.info( "progress_apply: Checking components balanced" )
         # Example input rows:
         # MASTER_ID components_equation
-        # 10100 nan + SLM:000000510 (acyl) = nan + nan + SLM:000000510 (free fatty acid)
         # 10272 SLM:000000510 (sn1 or sn2) + nan = nan + SLM:000000510 (sn1 or sn2) + nan
-        # 10352 nan + nan = nan + nan
+        # 11488	nan + SLM:000000510 (free fatty acid) = SLM:000000510 (acyl) + nan
         parsed = df_result['components_equation'].progress_apply(__get_component_changes).apply(pd.Series)
         df_result = pd.concat([df_result, parsed], axis=1)
         if DEBUG > 0:
             df_result.to_csv(os.path.join(self.output_dir, 'DEBUG_df_result-before-applying-components-balanced.tsv'), sep="\t", header=True, index=False)
-
         # Store exceptions:
         # 63596, 78043, 77759, 78435 have triglyceride twice in reactants, therefore sn1 is not unique, 
         # there is sn1 of the first tryglyceride, and sn2 of the second, which makes the code confused
         df_change_of_sn_by_design = df_result[df_result['MASTER_ID'].isin([63596, 78043, 77759, 78435])]
-        df_change_of_sn_by_design['component_match']='no_component_match'
+        df_change_of_sn_by_design['component_match'] = 'no_component_match'
         # Get list of boolean '_change' columns and remove rows where any of them is True.
         change_cols = [col for col in df_result.columns if col.endswith('_change')]
         df_result = df_result[~df_result[change_cols].any(axis=1)]
+        stats["reactions"].append( "%8d Reactions enumerated (after filtering unbalanced components)\n" % len(df_result) )
+        stats["rhea"].append( "%8d Rhea IDs (after filtering unbalanced components)\n" % len(df_result['MASTER_ID'].unique()) )
         # Now add back the exceptions.
         df_result = pd.concat([df_result, df_change_of_sn_by_design])
         if DEBUG > 0:
             df_result.to_csv(os.path.join(self.output_dir, 'DEBUG_df_result-after-checking-components-balanced.tsv'), sep="\t", header=True, index=False)
-        logger.info( "Statistics: %8d Reactions (after filtering unbalanced components)\n", len(df_result) )
-        logger.info( "Statistics: %8d Rhea IDs (after filtering unbalanced components)", len(df_result['MASTER_ID'].unique()) )
-        df_rhea['7_after_dropping_incorrect_component_matches'] = df_rhea['MASTER_ID'].isin(df_result['MASTER_ID'])
+        stats["reactions"].append( "%8d Reactions enumerated (after adding back triglyceride exceptions)\n" % len(df_result) )
+        stats["rhea"].append( "%8d Rhea IDs (after adding back triglyceride exceptions)\n" % len(df_result['MASTER_ID'].unique()) )
 
         # Filter unbalanced reactions.
         rxn = Reaction()
@@ -530,33 +526,32 @@ class RheaToSwisslipidsDf():
         df_result = df_result[df_result['balanced'] == True]
         df_result.drop(columns=['balanced'], inplace=True)
         MASTER_ID_for_specific_fatty_acids_after_filtering_out_the_unbalanced = len(set(df_result['MASTER_ID']))
-        df_rhea['8_after_dropping_unbalanced_reactions'] = df_rhea['MASTER_ID'].isin(df_result['MASTER_ID'])
         num_reactions_after_filtering_out_the_unbalanced = len(df_result)
-        logger.info( "Statistics: %8d Reactions (after filtering unbalanced reactions)\n", len(df_result) )
-        logger.info( "Statistics: %8d Rhea IDs (after filtering unbalanced reactions)", len(df_result['MASTER_ID'].unique()) )
+        stats["reactions"].append( "%8d Reactions enumerated (after filtering unbalanced reactions)\n" % len(df_result) )
+        stats["rhea"].append( "%8d Rhea IDs (after filtering unbalanced reactions)\n" % len(df_result['MASTER_ID'].unique()) )
         
         # Filter reactions with too many bond changes.
         logger.info( "progress_apply: Checking number of bond changes" )
         df_result['bond_breakage_max_4'] = df_result.progress_apply(__check_reactions_for_which_component_matching_was_impossible_with_atom_mapper, axis=1, args=[dict_rhea2bond_changes,])
         df_result = df_result[df_result['bond_breakage_max_4'] == True]
-        logger.info( "Statistics: %8d Reactions (after filtering too many bond changes)\n", len(df_result) )
-        logger.info( "Statistics: %8d Rhea IDs (after filtering too many bond changes)\n", len(df_result['MASTER_ID'].unique()) )
-        df_rhea.to_csv(os.path.join(self.output_dir, f'{self.timestamp}_rhea_overview.tsv'), sep='\t', index=False)
+        stats["reactions"].append( "%8d Reactions enumerated (after filtering too many bond changes)\n" % len(df_result) )
+        stats["rhea"].append( "%8d Rhea IDs (after filtering too many bond changes)\n" % len(df_result['MASTER_ID'].unique()) )
 
         # Generate RInChI and Web-RInChIKey.
         logger.info( "progress_apply: Generating RInChI" )
         rinchi = RInChI()
-        if len(df_result)>0:
+        if len(df_result) > 0:
             df_result[['RInChI', 'Web-RInChIKey']] = df_result.progress_apply(
                 lambda x: rinchi.error_handle_wrap_rinchi(x['reaction_smiles']),
                 axis=1, result_type='expand'
             )
         
-            # Filter reactions without Web-RInChIKey (without structures) and duplicates.
+            # Filter reactions without Web-RInChIKey (without structures) and duplicate Web-RInChIKey.
             df_result.dropna(subset=['Web-RInChIKey'], inplace=True)
             df_result.drop_duplicates(subset=['MASTER_ID', 'Web-RInChIKey', 'reaction_smiles'], inplace=True)
-            logger.info( "Statistics: %8d Reactions after filtering empty and duplicated Web-RInChIKey", len(df_result) )
-            
+            stats["reactions"].append( "%8d Reactions enumerated (after filtering empty and duplicated Web-RInChIKey)\n" % len(df_result) )
+            stats["rhea"].append( "%8d Rhea IDs (after filtering empty and duplicated Web-RInChIKey)\n" % len(df_result['MASTER_ID'].unique()) )
+
             # Save final result.
             df_result.to_csv(os.path.join(self.output_dir, filename), sep='\t', index=False)
 

@@ -439,7 +439,7 @@ class SwissLipids():
         df_slm2chebi.dropna(subset=['CHEBI'], inplace=True)
         # Bug in lipids.tsv: There is one row with CHEBI:82731 instead of 82731.
         df_slm2chebi['chebi_id'] = df_slm2chebi['CHEBI'].apply(lambda x: int(float(x.replace('CHEBI:', ''))) if isinstance(x, str) else int(x))
-        self.df_slm2chebi = df_slm2chebi
+        self.df_slm2chebi = df_slm2chebi[['Lipid ID', 'chebi_id']]
         return df_slm2chebi
    
     def SLMs_from_CHEBIs(self, list_of_chebi_ids):
