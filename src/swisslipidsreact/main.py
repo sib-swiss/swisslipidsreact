@@ -174,13 +174,27 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         df_iso_class_in_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class_in_rhea.tsv'), sep="\t", header=True, index=False) 
         df_iso_class_not_in_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class_not_in_rhea.tsv'), sep="\t", header=True, index=False)
     
-    # Keep only reactions with at least one participant that was used as a class in the enumeration.
+    # Keep only reactions with at least one participant on each side that was
+    # used as a class in the enumeration.
     # NB: We can only do this here, because it needs a clean column 'chebi_id'.
     if filter_rhea == True:
-        l_rhea_used_in_enumeration = r2sl.df_rhea2participants2slm.loc[r2sl.df_rhea2participants2slm['chebi_id'].isin(l_iso_class_chebi), 'MASTER_ID'].unique().tolist()
+        df = r2sl.df_rhea2participants2slm.copy()
+        # Extract L/R suffix from "reaction_side" column into new "side" column.
+        df["side"] = df["reaction_side"].str[-1]
+        # Determine which rows match a class used in the enumeration.
+        df["match"] = df["chebi_id"].isin(l_iso_class_chebi)
+        # Pivot the dataframe: group by "MASTER_ID", split by "side" values, aggregate "match" values (True/False)
+        # -> MASTER_ID | L | R
+        # NB: df.pivot_table() is faster than df.apply() -> C‑optimized, no Python loops.
+        agg = df.pivot_table(index="MASTER_ID", columns="side", values="match", aggfunc="any", fill_value=False)
+        # Get the MASTER_IDs where both sides have at least one "match"=True.
+        l_rhea_used_in_enumeration = agg[(agg["L"]) & (agg["R"])].index
         if DEBUG > 1:
             df_rhea_not_used_in_enumeration = df_rhea[~df_rhea['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
             df_rhea_not_used_in_enumeration.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_not_used_in_enumeration.tsv'), sep="\t", header=True, index=False)
+        
+        # This would be less restrictive (only one side has to match):
+        # l_rhea_used_in_enumeration = r2sl.df_rhea2participants2slm.loc[r2sl.df_rhea2participants2slm['chebi_id'].isin(l_iso_class_chebi), 'MASTER_ID'].unique().tolist()
         
         r2sl.df_rhea2participants2slm = r2sl.df_rhea2participants2slm[r2sl.df_rhea2participants2slm['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
         stats["participants"].append( "%8d Rhea participants (after filtering by SLM used in enumeration)\n" % len(r2sl.df_rhea2participants2slm) )
