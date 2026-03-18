@@ -52,6 +52,7 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     # - Get the ChEBI ID for each SLM ID.
     df_iso_class2chebi = df_iso_class.merge(df_slm2chebi, left_on='Lipid class*', right_on='Lipid ID', how='inner')
     df_iso_class2chebi = df_iso_class2chebi[["Lipid ID", "chebi_id"]]
+    stats["lipids"].append( "%8d SwissLipids class ChEBI IDs of isomeric subspecies (df_iso_class2chebi)\n" % len(df_iso_class2chebi) )
     if DEBUG > 1:
         logger.debug( "FORMAT: df_iso_class2chebi\n%s", debug_df_first_row(df_iso_class2chebi) )
         df_iso_class2chebi.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class2chebi.tsv'), sep="\t", header=True, index=False)
@@ -149,18 +150,6 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     stats["participants"].append( "%8d Rhea participants (after filtering by polymers)\n" % len(df_rhea2participants) )
     stats["rhea"].append( "%8d Rhea IDs (after filtering by polymers)\n" % len(df_rhea2participants['MASTER_ID'].unique()) )
     
-    # Keep only reactions with at least one participant that was used as a class in the enumeration.
-    # NB: We can only do this here, because it needs a clean column 'chebi_id'.
-    if filter_rhea == True:
-        l_rhea_used_in_enumeration = df_rhea2participants.loc[df_rhea2participants['chebi_id'].isin(l_iso_class_chebi), 'MASTER_ID'].unique().tolist()
-        if DEBUG > 1:
-            df_rhea_not_used_in_enumeration = df_rhea[~df_rhea['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
-            df_rhea_not_used_in_enumeration.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_not_used_in_enumeration.tsv'), sep="\t", header=True, index=False)
-        
-        df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
-        stats["participants"].append( "%8d Rhea participants (after filtering by SLM used in enumeration)\n" % len(df_rhea2participants) )
-        stats["rhea"].append( "%8d Rhea IDs (after filtering by SLM used in enumeration)\n" % len(df_rhea2participants['MASTER_ID'].unique()) )
-        
     # Class RheaToSwissLipids merges Rhea and SwissLipids data.
     r2sl = RheaToSwisslipidsDf(output_dir=output_dir, timestamp=timestamp)
     # df_rhea2participants2slm maps Rhea participants chebi_id to the corresponding SLM ID ('Lipid ID'):
@@ -172,12 +161,11 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         logger.debug( "FORMAT: df_rhea2participants2slm\n%s", debug_df_first_row(r2sl.df_rhea2participants2slm) )
         r2sl.df_rhea2participants2slm.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea2participants2slm.tsv'), sep="\t", header=True, index=False)
 
-    # Get the list of unique SwissLipids SLM IDs in Rhea:
-    # this will include those selected via l_iso_class_chebi, but may also contain others.     
+    # Get the list of unique SwissLipids SLM IDs in Rhea.
     SLMs_in_rhea = r2sl.df_rhea2participants2slm['Lipid ID'].unique()
     stats["lipids"].append( "%8d SwissLipids SLMs IDs in Rhea\n" % len(SLMs_in_rhea) )
     # Check which isomeric subspecies are not covered in Rhea:
-    # these are candidates for new reactions.
+    # some are candidates for new reactions?
     df_iso_class_in_rhea     = df_iso_class2chebi[df_iso_class2chebi['Lipid ID'].isin(SLMs_in_rhea)][["Lipid ID", "chebi_id"]]
     df_iso_class_not_in_rhea = df_iso_class2chebi[~df_iso_class2chebi['Lipid ID'].isin(SLMs_in_rhea)][["Lipid ID", "chebi_id"]]
     stats["lipids"].append( "%8d SwissLipids class SLMs IDs of isomeric subspecies in Rhea\n"     % len(df_iso_class_in_rhea) )
@@ -186,6 +174,20 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         df_iso_class_in_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class_in_rhea.tsv'), sep="\t", header=True, index=False) 
         df_iso_class_not_in_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class_not_in_rhea.tsv'), sep="\t", header=True, index=False)
     
+    # Keep only reactions with at least one participant that was used as a class in the enumeration.
+    # NB: We can only do this here, because it needs a clean column 'chebi_id'.
+    if filter_rhea == True:
+        l_rhea_used_in_enumeration = r2sl.df_rhea2participants2slm.loc[r2sl.df_rhea2participants2slm['chebi_id'].isin(l_iso_class_chebi), 'MASTER_ID'].unique().tolist()
+        if DEBUG > 1:
+            df_rhea_not_used_in_enumeration = df_rhea[~df_rhea['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
+            df_rhea_not_used_in_enumeration.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_not_used_in_enumeration.tsv'), sep="\t", header=True, index=False)
+        
+        r2sl.df_rhea2participants2slm = r2sl.df_rhea2participants2slm[r2sl.df_rhea2participants2slm['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
+        stats["participants"].append( "%8d Rhea participants (after filtering by SLM used in enumeration)\n" % len(r2sl.df_rhea2participants2slm) )
+        stats["rhea"].append( "%8d Rhea IDs (after filtering by SLM used in enumeration)\n" % len(r2sl.df_rhea2participants2slm['MASTER_ID'].unique()) )
+        SLMs_in_rhea = r2sl.df_rhea2participants2slm['Lipid ID'].unique()
+        stats["lipids"].append( "%8d SwissLipids SLMs IDs in Rhea (after filtering by SLM used in enumeration)\n" % len(SLMs_in_rhea) )    
+        
     # Compute and cache the bond changes (we use them later to filter the enumeration results).
     # This takes app. 20min to compute, therefore we cache the result file in the rhea release folder.
     def __get_attention_guided_atom_map_error_wrap(mapped_rxn):
@@ -214,8 +216,9 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
 
     # df_rhea_slm_class2iso maps a Rhea class SLM ID to its isomeric subspecies SLM IDs:
     # class_slm_id | iso_slm_id | Lipid ID | Level | Name | Lipid class* | Components* | SMILES (pH7.3) | CHEBI | sn1' | sn2' | ...
-    # NB: iso_slm_id = Lipid ID
-    df_rhea_slm_class2iso = sl.build_df_slm_class2iso(SLMs_in_rhea)
+    # NB: iso_slm_id = Lipid ID        
+    # Optionally, filter fatty acids.
+    df_rhea_slm_class2iso = sl.build_and_filter_df_slm_class2iso(SLMs_in_rhea, filter_fa, stats, test)
     stats["lipids"].append( "-------- df_rhea_slm_class2iso statistics:\n" )
     stats["lipids"].append( "%8d pairs of Rhea class/isomeric subspecies SLM IDs\n" % len(df_rhea_slm_class2iso) )
     stats["lipids"].append( "%8d Rhea class SLM IDs\n" % len(set(df_rhea_slm_class2iso["class_slm_id"])) )
@@ -224,32 +227,8 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         logger.debug( "FORMAT: df_rhea_slm_class2iso\n%s", debug_df_first_row(df_rhea_slm_class2iso) )
         df_rhea_slm_class2iso.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_slm_class2iso.tsv'), sep="\t", header=True, index=False)
     
-    # Optionally, filter fatty acids.
-    df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
-    if filter_fa == "curated":
-        df_rhea_slm_class2iso_filtered, all_lipids_considered = sl.filter_fa_curated(test=test)
-        stats["lipids"].append( "%8d curated SLM pairs of Rhea class/isomeric subspecies SLM IDs (df_rhea_slm_class2iso_filtered)\n" % len(df_rhea_slm_class2iso_filtered) )
-        df_rhea_slm_class2iso_not_filtered = df_rhea_slm_class2iso[~df_rhea_slm_class2iso['Lipid ID'].isin(all_lipids_considered)]
-        stats["lipids"].append( "%8d uncurated SLM pairs of Rhea class/isomeric subspecies SLM IDs (df_rhea_slm_class2iso_not_filtered)\n" % len(df_rhea_slm_class2iso_not_filtered) )
-        if DEBUG > 1:
-            df_rhea_slm_class2iso_not_filtered.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_slm_class2iso_not_filtered.tsv'), sep="\t", header=True, index=False)
-                                                                                                    
-        # Add those lipids that were not in the list with positions.
-        df_rhea_slm_class2iso_filtered = pd.concat([df_rhea_slm_class2iso_filtered, df_rhea_slm_class2iso_not_filtered])
-        stats["lipids"].append( "%8d curated and uncurated SLM pairs of Rhea class/isomeric subspecies SLM IDs (df_rhea_slm_class2iso_filtered)\n" % len(df_rhea_slm_class2iso_filtered) )
-        
-    stats["lipids"].append( "-------- df_rhea_slm_class2iso statistics after optional filter_fa == 'curated':\n" )
-    stats["lipids"].append( "%8d pairs of Rhea class/isomeric subspecies SLM IDs\n" % len(df_rhea_slm_class2iso_filtered) )  
-    if DEBUG > 1:
-        # FORMAT: df_rhea_slm_class2iso_filtered = df_rhea_slm_class2iso
-        logger.debug( "FORMAT: df_rhea_slm_class2iso_filtered\n%s", debug_df_first_row(df_rhea_slm_class2iso_filtered) )
-
-    # TODO: Do we still need this?
-    df_rhea_slm_class2iso_temp = df_rhea_slm_class2iso[df_rhea_slm_class2iso['Lipid ID'].isin(df_rhea_slm_class2iso_filtered['Lipid ID'])]
-    stats["lipids"].append( "%8d df_rhea_slm_class2iso_temp\n" % len(df_rhea_slm_class2iso_temp) )
-    
     # Map Rhea participants class to isomeric subspecies SLM IDs.
-    r2sl.build_df_rhea2participants2slm_class2iso(df_rhea_slm_class2iso_temp, sl.swisslipids)
+    r2sl.build_df_rhea2participants2slm_class2iso(df_rhea_slm_class2iso, sl.swisslipids)
     stats["participants"].append( "%8d Rhea participants (after mapping participant class SLM ID to isomeric subspecies SLM IDs)\n" % len(r2sl.df_rhea2participants2slm_class2iso) )
     stats["rhea"].append( "%8d Rhea IDs (after mapping participant class SLM ID to isomeric subspecies SLM IDs)\n" % len(r2sl.df_rhea2participants2slm_class2iso['MASTER_ID'].unique()) )
     # NB: There are 'nan' values after the LEFT merge, therfore use dropna() to exclude them from the stats.

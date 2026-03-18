@@ -268,7 +268,7 @@ class SwissLipids():
             self.swisslipids = pd.read_csv(lipids_components_split_cache_file, sep='\t', low_memory=False)
         
         # Build a dataframe with only isomeric subspecies.
-        self.build_df_isomeric_subspecies(filter_fa, test)
+        self.build_df_isomeric_subspecies()
         self.get_lipid_class_graph()
     
     def get_lipid_class_graph(self):
@@ -287,14 +287,95 @@ class SwissLipids():
             df_expanded, source='Lipid class*', target='Lipid ID', create_using=nx.DiGraph()
         )
 
-    def filter_fa_curated(self, test=False):
+    def build_and_filter_df_slm_class2iso(self, SLMs, filter_fa, stats=None, test=False):
+
+        df_slm_class2iso = self.build_df_slm_class2iso(SLMs)
+        if DEBUG > 1:
+            df_slm_class2iso.to_csv(os.path.join(self.output_dir, 'DEBUG_df_slm_class2iso_start.tsv'), sep="\t", header=True, index=False)
+        
+        if filter_fa == "curated":
+            # Build a dataframe of parent class/isomeric subspecies that match curated rules.
+            df_iso_curated_parent, iso_curated = self.build_df_iso_curated_parent(test=test)
+            stats["lipids"].append( "%8d curated pairs of parent class/isomeric subspecies SLM IDs (df_iso_curated_parent)\n" % len(df_iso_curated_parent) )
+            # Get the rows from the original df_slm_class2iso whose isomeric subspecies matches those in df_iso_curated_parent.
+            # This includes rows for classes that are not the direct parents of these isomeric subspecies.
+            df_iso_curated = df_slm_class2iso[df_slm_class2iso['iso_slm_id'].isin(df_iso_curated_parent['iso_slm_id'])]
+            stats["lipids"].append( "%8d curated pairs of class/isomeric subspecies SLM IDs (df_iso_curated)\n" % len(df_iso_curated) )
+            # Get a dataframe of isomeric subspecies that did not match curated rules.
+            df_iso_not_curated = df_slm_class2iso[~df_slm_class2iso['iso_slm_id'].isin(iso_curated)]
+            stats["lipids"].append( "%8d uncurated pairs of class/isomeric subspecies SLM IDs (df_iso_not_curated)\n" % len(df_iso_not_curated ) )
+            # Concatenate the 2 dataframes.
+            df_slm_class2iso = pd.concat([df_iso_curated, df_iso_not_curated])
+            stats["lipids"].append( "%8d curated and uncurated pairs of class/isomeric subspecies SLM IDs (df_slm_class2iso)\n" % len(df_slm_class2iso) )
+        
+        if filter_fa == "c16":
+            df_slm_class2iso = self.filter_fa_c16(df_slm_class2iso=df_slm_class2iso, test=test)
+            stats["lipids"].append( "%8d c16-filtered pairs of class/isomeric subspecies SLM IDs (df_slm_class2iso)\n" % len(df_slm_class2iso) )
+
+        if DEBUG > 1:
+            df_slm_class2iso.to_csv(os.path.join(self.output_dir, 'DEBUG_df_slm_class2iso_end.tsv'), sep="\t", header=True, index=False)
+
+        return df_slm_class2iso
+
+    def filter_fa_c16(self, df_slm_class2iso, test=False):
+
+        # Format of df_slm_class2iso
+        # [0] - class_slm_id
+        # [1] - iso_slm_id
+        # [2] - Lipid ID
+        # [3] - Level
+        # [4] - Name
+        # [5] - Lipid class*
+        # [6] - Components*
+        # [7] - SMILES (pH7.3)
+        # [8] - CHEBI
+        # [9] - sn1'
+        # [10] - sn2'
+        # [11] - n-acyl
+        # [12] - sn1
+        # [13] - sn2
+        # [14] - sn3
+        # [15] - acyl
+        # [16] - free fatty acid
+        # [17] - free fatty alcohol
+        
+        # Filter isomeric subspecies by C16 rule.
+        PAL_C16   = "SLM:000000510" # CHEBI:7896  - fatty acid
+        PALOH_C16 = "SLM:000000202" # CHEBI:16125 - fatty alcohol (position sn1)
+
+        # Allow maximum 1 fatty acid that is not C16.
+        max_not_c16 = 1
+        if test == True:
+            # In test mode all fatty acids must be C16.
+            max_not_c16 = 0
+
+        # The lipid components are stored in the 'positions' columns (index 9-17).
+        # columns[9:18] means: start at index 9 and go up to but not including index 18.
+        df_positions = df_slm_class2iso.columns[9:18] # keeps the original names
+
+        # Remove the rows were all 'positions' columns are empty/undefined
+        # to keep only rows with at least one component.
+        df_components = df_slm_class2iso[~df_slm_class2iso[df_positions].replace("", pd.NA).isna().all(axis=1)]
+        logger.debug( "LENGTH: %8d df_isomeric_subspecies rows with components", len(df_components) )
+
+        # Flag cells in the 'positions' columns that are defined AND not equal to C16.
+        violations = df_components[df_positions].applymap(lambda x:
+                                                          isinstance(x, str) and
+                                                          x is not None and
+                                                          x != PAL_C16 and
+                                                          x != PALOH_C16)
+
+        # Keep only rows where the sum of the violations is <= max_not_c16
+        df_slm_class2iso = df_components[violations.sum(axis=1) <= max_not_c16].copy()
+        logger.info( "LENGTH: %8d df_slm_class2iso (after C16 filter)", len(df_slm_class2iso) )
+        return df_slm_class2iso
+
+    def build_df_iso_curated_parent(self, test=False):
         """
-        Creates df prefiltered to only have lipids specific for a particular positions / FA
+        Builds a dataframe of pairs of parent class/isomeric subspecies that match curated rules for positions/FA.
         Columns:
-        ['class_slm_id', 'iso_slm_id', 'Lipid ID',
-        'Level', 'Name', 'Lipid class*', 'Components*', 'SMILES (pH7.3)',
-        'CHEBI', 'sn1'', 'sn2'', 'n-acyl', 'sn1', 'sn2', 'sn3',
-        'free fatty acid', 'free fatty alcohol']
+        ['class_slm_id', 'iso_slm_id', 'Lipid ID', 'Level', 'Name', 'Lipid class*', 'Components*', 'SMILES (pH7.3)', 'CHEBI', 
+        'sn1'', 'sn2'', 'n-acyl', 'sn1', 'sn2', 'sn3', 'free fatty acid', 'free fatty alcohol']
         """
 
         # Generate FA pools only once
@@ -340,15 +421,14 @@ class SwissLipids():
         }
 
         df_slices = []
-
         res_filtering = []
-        all_lipids_considered = []
+        iso_curated = []
         # Main filtering loop
         for chebiid, sn_to_descr in chebi_class_to_sn_positions.items():
             # Here I introduced the flag for degugging to make sure that a certain chebi is 
             # appearing in the dataframe with the descendants
             flag_print = False
-            if chebiid == 'test_chebi_id': # Example: 17002
+            if chebiid == 'test_chebi_id': # Replace with test example 17002
                 flag_print = True
             res_chebi_id = [chebiid]
             SLM_classes = self.SLMs_from_CHEBIs([chebiid])
@@ -358,12 +438,12 @@ class SwissLipids():
                 print(f'No SLM ID found for {chebiid}')
                 continue
 
-            df_desc = self.build_df_slm_class2iso(SLM_classes)
-            all_lipids_considered.extend(df_desc['Lipid ID'].tolist())
+            df_class2iso = self.build_df_slm_class2iso(SLM_classes)
+            iso_curated.extend(df_class2iso['iso_slm_id'].tolist())
             if flag_print == True:
-                print('descendants before filtering', len(df_desc))
-                df_desc.to_csv('test.tsv', sep='\t',index=False)
-            res_chebi_id.append(len(df_desc))
+                print('descendants before filtering', len(df_class2iso))
+                df_class2iso.to_csv('test.tsv', sep='\t',index=False)
+            res_chebi_id.append(len(df_class2iso))
             for sn, descr in sn_to_descr.items():
                 fa_list = pos_descr_to_FA_list.get(descr)
                 if flag_print == True:
@@ -371,10 +451,10 @@ class SwissLipids():
                 if fa_list is None:
                     print(f'fa list not found for {sn} {descr}')
                     continue  # skip if mapping not found
-                df_desc = df_desc[df_desc[sn].isin(fa_list)]
+                df_class2iso = df_class2iso[df_class2iso[sn].isin(fa_list)]
                 if flag_print==True:
-                    print('descendants after filtering', len(df_desc))
-            res_chebi_id.append(len(df_desc))
+                    print('descendants after filtering', len(df_class2iso))
+            res_chebi_id.append(len(df_class2iso))
             res_filtering.append(res_chebi_id)
 
             if flag_print==True:
@@ -382,15 +462,13 @@ class SwissLipids():
 
             # Filter the final_df to retain only rows that are descendants of SLM:000399813 if they have sphing-4-enine base (based on the name)
             glycosphingolipid_slm = "SLM:000399813"
-
             if glycosphingolipid_slm in SLM_classes:
-
                 # Filter for rows where the class_slm_id corresponds to glycosphingolipid descendants
-                descendants_df = df_desc[df_desc['class_slm_id'] == glycosphingolipid_slm]
+                df_class2iso_glyco = df_class2iso[df_class2iso['class_slm_id'] == glycosphingolipid_slm]
                 # Further filter where Name contains (d18:1(4E)/*)
-                df_desc = descendants_df[descendants_df['Name'].str.contains(r'\(d18:1\(4E\)/.+\)', regex=True)]
+                df_class2iso = df_class2iso_glyco[df_class2iso_glyco['Name'].str.contains(r'\(d18:1\(4E\)/.+\)', regex=True)]
 
-            df_slices.append(df_desc)
+            df_slices.append(df_class2iso)
         
         with open(os.path.join(self.output_dir, f'{self.timestamp}_FA_per_class_filtering.tsv'), 'w') as w:
             w.write('Chebiid\tdescendants_total\tdescendants_with_def_components\n')
@@ -398,9 +476,9 @@ class SwissLipids():
                 w.write(f'{res[0]}\t{res[1]}\t{res[2]}\n')
 
         # Combine all results
-        final_df = pd.concat(df_slices, ignore_index=True) if df_slices else pd.DataFrame()
+        df_iso_curated_parent = pd.concat(df_slices, ignore_index=True) if df_slices else pd.DataFrame()
 
-        return final_df, all_lipids_considered
+        return df_iso_curated_parent, iso_curated
     
     # ---------- Lipid Class Graph Analysis ----------
     def build_df_slm_class2iso(self, class_SLMs):
@@ -463,64 +541,13 @@ class SwissLipids():
         return df_expanded['Lipid class*'].dropna().drop_duplicates().to_frame()
 
 
-    def build_df_isomeric_subspecies(self, filter_fa, test=False):
+    def build_df_isomeric_subspecies(self):
         """
         Builds self.df_isomeric_subspecies
         """
         isomeric_subspecies = self.swisslipids[self.swisslipids['Level'] == 'Isomeric subspecies']
         self.df_isomeric_subspecies = isomeric_subspecies.copy()
         logger.info( "LENGTH: %8d df_isomeric_subspecies", len(self.df_isomeric_subspecies) )
-        
-        if filter_fa == "c16":
-            
-            # Filter isomeric subspecies by C16 rule.
-            PAL_C16   = "SLM:000000510" # CHEBI:7896  - fatty acid
-            PALOH_C16 = "SLM:000000202" # CHEBI:16125 - fatty alcohol (position sn1)
-
-            # Allow maximum 1 fatty acid that is not C16.
-            max_not_c16 = 1
-            if test == True:
-                # In test mode all fatty acids must be C16.
-                max_not_c16 = 0
-
-            # Format of lipids_components_split.tsv
-            # [0] - Lipid ID
-            # [1] - Level
-            # [2] - Name
-            # [3] - Lipid class*
-            # [4] - Components*
-            # [5] - SMILES (pH7.3)
-            # [6] - CHEBI
-            # [7] - sn1'
-            # [8] - sn2'
-            # [9] - n-acyl
-            # [10] - sn1
-            # [11] - sn2
-            # [12] - sn3
-            # [13] - acyl
-            # [14] - free fatty acid
-            # [15] - free fatty alcohol
-
-            # The lipid components are stored in the 'positions' columns (index 7-15).
-            # columns[7:16] means: start at index 7 and go up to but not including index 16.
-            df_positions = self.df_isomeric_subspecies.columns[7:16] # keeps the original names
-
-            # Remove the rows were all 'positions' columns are empty/undefined
-            # to keep only rows with at least one component.
-            df_components = self.df_isomeric_subspecies[~self.df_isomeric_subspecies[df_positions].replace("", pd.NA).isna().all(axis=1)]
-            logger.debug( "LENGTH: %8d df_isomeric_subspecies rows with components", len(df_components) )
-
-            # Flag cells in the 'positions' columns that are defined AND not equal to C16.
-            violations = df_components[df_positions].applymap(lambda x:
-                                                              isinstance(x, str) and
-                                                              x is not None and
-                                                              x != PAL_C16 and
-                                                              x != PALOH_C16)
-
-            # Keep only rows where the sum of the violations is <= max_not_c16
-            self.df_isomeric_subspecies = df_components[violations.sum(axis=1) <= max_not_c16].copy()
-            logger.info( "LENGTH: %8d df_isomeric_subspecies (after C16 filter)", len(self.df_isomeric_subspecies) )
-
-        logger.debug( "FORMAT: df_isomeric_subspecies\n%s", debug_df_first_row(self.df_isomeric_subspecies) )
         if DEBUG > 1:
+            logger.debug( "FORMAT: df_isomeric_subspecies\n%s", debug_df_first_row(self.df_isomeric_subspecies) )
             self.df_isomeric_subspecies.to_csv(os.path.join(self.output_dir, 'DEBUG_df_isomeric_subspecies.tsv'), sep="\t", header=True, index=False)
