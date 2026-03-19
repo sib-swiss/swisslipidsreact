@@ -41,8 +41,10 @@ def main():
     )
     parser_run.add_argument(
         "--filter-rhea",
-        action = "store_true",
-        help = "Filter Rhea by the SLM classes of the isomeric subspecies (default: False)"
+        type = str,
+        choices = ["two-sides", "one-side"],
+        default = "two-sides",
+        help = "Filter Rhea by having an SLM class of an isomeric subspecies on at least one or both sides of the reaction: two-sides (default), one-side"
     )
     parser_run.add_argument(
         "--rhea-id",

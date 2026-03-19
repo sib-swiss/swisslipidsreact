@@ -174,10 +174,10 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         df_iso_class_in_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class_in_rhea.tsv'), sep="\t", header=True, index=False) 
         df_iso_class_not_in_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_class_not_in_rhea.tsv'), sep="\t", header=True, index=False)
     
-    # Keep only reactions with at least one participant on each side that was
-    # used as a class in the enumeration.
+    # Keep only reactions with participants that have been used as a class in the enumeration.
     # NB: We can only do this here, because it needs a clean column 'chebi_id'.
-    if filter_rhea == True:
+    # - Option: EACH side has a participant that is a class SLMs IDs of isomeric subspecies.
+    if filter_rhea == "two-sides":
         df = r2sl.df_rhea2participants2slm.copy()
         # Extract L/R suffix from "reaction_side" column into new "side" column.
         df["side"] = df["reaction_side"].str[-1]
@@ -189,18 +189,19 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         agg = df.pivot_table(index="MASTER_ID", columns="side", values="match", aggfunc="any", fill_value=False)
         # Get the MASTER_IDs where both sides have at least one "match"=True.
         l_rhea_used_in_enumeration = agg[(agg["L"]) & (agg["R"])].index
-        if DEBUG > 1:
-            df_rhea_not_used_in_enumeration = df_rhea[~df_rhea['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
-            df_rhea_not_used_in_enumeration.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_not_used_in_enumeration.tsv'), sep="\t", header=True, index=False)
+    # - Option: At least ONE side has a participant that is a class SLMs IDs of isomeric subspecies.
+    else:
+        l_rhea_used_in_enumeration = r2sl.df_rhea2participants2slm.loc[r2sl.df_rhea2participants2slm['chebi_id'].isin(l_iso_class_chebi), 'MASTER_ID'].unique().tolist()
         
-        # This would be less restrictive (only one side has to match):
-        # l_rhea_used_in_enumeration = r2sl.df_rhea2participants2slm.loc[r2sl.df_rhea2participants2slm['chebi_id'].isin(l_iso_class_chebi), 'MASTER_ID'].unique().tolist()
-        
-        r2sl.df_rhea2participants2slm = r2sl.df_rhea2participants2slm[r2sl.df_rhea2participants2slm['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
-        stats["participants"].append( "%8d Rhea participants (after filtering by SLM used in enumeration)\n" % len(r2sl.df_rhea2participants2slm) )
-        stats["rhea"].append( "%8d Rhea IDs (after filtering by SLM used in enumeration)\n" % len(r2sl.df_rhea2participants2slm['MASTER_ID'].unique()) )
-        SLMs_in_rhea = r2sl.df_rhea2participants2slm['Lipid ID'].unique()
-        stats["lipids"].append( "%8d SwissLipids SLMs IDs in Rhea (after filtering by SLM used in enumeration)\n" % len(SLMs_in_rhea) )    
+    if DEBUG > 1:
+        df_rhea_not_used_in_enumeration = df_rhea[~df_rhea['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
+        df_rhea_not_used_in_enumeration.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_not_used_in_enumeration.tsv'), sep="\t", header=True, index=False)
+    
+    r2sl.df_rhea2participants2slm = r2sl.df_rhea2participants2slm[r2sl.df_rhea2participants2slm['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
+    stats["participants"].append( "%8d Rhea participants (after filtering by SLM used in enumeration)\n" % len(r2sl.df_rhea2participants2slm) )
+    stats["rhea"].append( "%8d Rhea IDs (after filtering by SLM used in enumeration)\n" % len(r2sl.df_rhea2participants2slm['MASTER_ID'].unique()) )
+    SLMs_in_rhea = r2sl.df_rhea2participants2slm['Lipid ID'].unique()
+    stats["lipids"].append( "%8d SwissLipids SLMs IDs in Rhea (after filtering by SLM used in enumeration)\n" % len(SLMs_in_rhea) )
         
     # Compute and cache the bond changes (we use them later to filter the enumeration results).
     # This takes app. 20min to compute, therefore we cache the result file in the rhea release folder.
