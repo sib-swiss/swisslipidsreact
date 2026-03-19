@@ -518,7 +518,9 @@ class RheaToSwisslipidsDf():
         # Filter unbalanced reactions.
         rxn = Reaction()
         logger.info( "progress_apply: Checking reaction balanced" )
-        df_result['balanced'] = df_result['reaction_smiles'].progress_apply(rxn.check_reaction_balance)
+        df_result['balanced'] = df_result['reaction_smiles'].progress_apply(
+            lambda reaction_smiles: rxn.check_reaction_balance(reaction_string=reaction_smiles, format="smiles", account_H=True)
+        )
         df_result = df_result[df_result['balanced'] == True]
         df_result.drop(columns=['balanced'], inplace=True)
         stats["reactions"].append( "%8d Reactions enumerated (after filtering unbalanced reactions)\n" % len(df_result) )
