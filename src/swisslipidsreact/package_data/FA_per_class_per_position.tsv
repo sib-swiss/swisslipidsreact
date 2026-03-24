@@ -1,0 +1,102 @@
+class	class_parent_CHEBI	sn1	sn2	sn3	sn1'	sn2'	n-acyl	sphingoid bases	free fatty acid	free fatty alcohol	acyl
+PA	CHEBI:57739	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+PC	CHEBI:64482	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+PE	CHEBI:57613	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+NAPE	CHEBI:62537	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	FAS_15	NA	NA	NA	NA
+PS	CHEBI:58436	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+PI	CHEBI:78231	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+"PI-3,4,5-trisphosphate"	CHEBI:57836	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+"PI-3,4-bisphosphate"	CHEBI:57658	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+"PI-3,5-bisphosphate"	CHEBI:57923	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+"PI-4,5-bisphosphate"	CHEBI:58456	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+PI-3-phosphate	CHEBI:58088	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+PI-4-phosphate	CHEBI:58178	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+PI-5-phosphate	CHEBI:57795	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+PG	CHEBI:60523	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+PGP	CHEBI:60522	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+2-acyl-sn-glycero-1-phospho-(2'-acyl-1'-sn-glycerol)	CHEBI:77720	NA	FAS_85	NA	NA	PAL_C16_OCT_C18	NA	NA	NA	NA	NA
+CDP-DGs	CHEBI:58332	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-acyl-sn-glycero-3-phosphate	CHEBI:57970	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA	NA
+2-acyl-sn-glycero-3-phosphate	CHEBI:64982	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-acyl-sn-glycero-3-phosphocholine	CHEBI:58168	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA	NA
+2-acyl-sn-glycero-3-phosphocholine	CHEBI:57875	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-acyl-sn-glycero-3-phosphoethanolamine zwitterion	CHEBI:64381	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA	NA
+2-acyl-sn-glycero-3-phosphoethanolamine zwitterion	CHEBI:65213	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-acyl-sn-glycero-3-phospho-L-serine	CHEBI:64379	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA	NA
+sn-glycero-3-phospho-N-acylethanolamine	CHEBI:85225	NA	NA	NA	NA	NA	FAS_15	NA	NA	NA	NA
+N-acyl-1-acyl-sn-glycero-3-phosphoethanolamine	CHEBI:85216	FAS_85	NA	NA	NA	NA	FAS_15	NA	NA	NA	NA
+2-acyl-sn-glycero-3-phospho-L-serine	CHEBI:65214	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-acyl-sn-glycero-3-phospho-1D-myo-inositol	CHEBI:64771	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA	NA
+2-acyl-sn-glycero-3-phospho-1D-myo-inositol	CHEBI:64872	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-acyl-sn-glycero-3-phospho-(1'-sn-glycerol)	CHEBI:64840	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA	NA
+2-acyl-sn-glycero-3-phospho-(1'-sn-glycerol)	CHEBI:76528	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkylglycero-3-phosphate	CHEBI:78168	FOH_15	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-sn-glycero-3-phosphate	CHEBI:77283	FOH_15 double bond C1-C2	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkyl-2-acyl-glycero-3-phosphate	CHEBI:78182	FOH_15	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-2-acyl-sn-glycero-3-phosphate	CHEBI:77284	FOH_15 double bond C1-C2	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkylglycero-3-phosphocholine	CHEBI:78193	FOH_15	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(alk-1Z-enyl)-sn-glycero-3-phosphocholine	CHEBI:77287	FOH_15 double bond C1-C2	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-alkyl-2-acyl-glycero-3-phosphocholine	CHEBI:78186	FOH_15	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-2-acyl-sn-glycero-3-phosphocholine	CHEBI:77286	FOH_15 double bond C1-C2	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkylglycero-3-phosphoethanolamine	CHEBI:78202	FOH_15	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-sn-glycero-3-phosphoethanolamine	CHEBI:77288	FOH_15 double bond C1-C2	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkyl-2-acyl-glycero-3-phosphoethanolamine	CHEBI:78197	FOH_15	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-2-acyl-sn-glycero-3-phosphoethanolamine	CHEBI:77290	FOH_15 double bond C1-C2	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-sn-glycero-3-phospho-N-acylethanolamine	CHEBI:140403	FOH_15 double bond C1-C2	NA	NA	NA	NA	FAS_15	NA	NA	NA	NA
+1-O-alkyl-sn-glycero-3-phospho-N-acylethanolamine	CHEBI:140404	FOH_15	NA	NA	NA	NA	FAS_15	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-2-acyl-sn-glycero-3-phospho-N-acylethanolamine	CHEBI:140451	FOH_15 double bond C1-C2	FAS_85	NA	NA	NA	FAS_15	NA	NA	NA	NA
+1-O-alkyl-2-acyl-sn-glycero-3-phospho-N-acylethanolamine	CHEBI:140514	FOH_15	FAS_85	NA	NA	NA	FAS_15	NA	NA	NA	NA
+1-alkylglycero-3-phosphoglycerol	CHEBI:132533	FOH_15	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-sn-glycero-3-phospho-(1'-sn-glycerol)	CHEBI:132528	FOH_15 double bond C1-C2	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-alkyl-2-acylglycero-3-phosphoglycerol	CHEBI:132531	FOH_15	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-2-acyl-sn-glycero-3-phospho-(1'-sn-glycerol)	CHEBI:132526	FOH_15 double bond C1-C2	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkylglycero-3-phosphoinositol	CHEBI:78873	FOH_15	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(alk-1Z-enyl)-sn-glycero-3-phospho-1D-myo-inositol	CHEBI:78794	FOH_15 double bond C1-C2	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkyl-2-acyl-glycero-3-phosphoinositol	CHEBI:78876	FOH_15	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(alk-1Z-enyl)-2-acyl-sn-glycero-3-phospho-1D-myo-inositol	CHEBI:78792	FOH_15 double bond C1-C2	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkylglycero-3-phospho-L-serine	CHEBI:78880	FOH_15	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-sn-glycero-3-phospho-L-serine	CHEBI:78789	FOH_15 double bond C1-C2	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkyl-2-acylglycero-3-phospho-L-serine	CHEBI:78224	FOH_15	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-2-acyl-sn-glycero-3-phospho-L-serine	CHEBI:78355	FOH_15 double bond C1-C2	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+Triacylglycerols (TGs):	CHEBI:17855	PAL_C16_OCT_C18	FAS_85	PAL_C16_OCT_C18	NA	NA	NA	NA	NA	NA	NA
+3-acyl-sn-glycerol	CHEBI:64760	NA	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA
+"1,2-diacylglycerol (DGs)"	CHEBI:49172	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+"1,3-diacylglycerol (DGs)"	CHEBI:47777	PAL_C16_OCT_C18	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA
+1-Monoacylglycerols (MGs)	CHEBI:35759	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA	NA
+2-Monoacylglycerols (MGs)	CHEBI:17389	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1(3)-O-alkylglycerol	CHEBI:77997	FOH_15	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-sn-glycerol	CHEBI:77297	FOH_15 double bond C1-C2	NA	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkyl-2-acylglycerol	CHEBI:598	FOH_15	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-(1Z-alkenyl)-2-acyl-sn-glycerol	CHEBI:77296	FOH_15 double bond C1-C2	FAS_85	NA	NA	NA	NA	NA	NA	NA	NA
+1-O-alkyl-3-acylglycerol	CHEBI:76225	FOH_15	NA	FAS_85	NA	NA	NA	NA	NA	NA	NA
+"1-O-alkyl-2,3-diacylglycerol"	CHEBI:36727	FOH_15	FAS_85	PAL_C16_OCT_C18	NA	NA	NA	NA	NA	NA	NA
+Cardiolipins (CLs)	CHEBI:62237	PAL_C16_OCT_C18	PAL_C16_OCT_C18	NA	PAL_C16_OCT_C18	FAS_85	NA	NA	NA	NA	NA
+2-monolysocardiolipin and 1-monolysocardiolipin	CHEBI:167057	PAL_C16_OCT_C18	FAS_85	NA	PAL_C16_OCT_C18	NA	NA	NA	NA	NA	NA
+Dilysocardiolipins	CHEBI:75137	PAL_C16_OCT_C18	NA	NA	PAL_C16_OCT_C18	NA	NA	NA	NA	NA	NA
+Ceramide (d18:0)	CHEBI:31488	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Ceramide (d18:1(4E))	CHEBI:52639	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Ceramide phosphate (d18:1(4E))	CHEBI:57674	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Ceramide phosphoethanolamine (d18:0)	CHEBI:78655	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Ceramide phosphoethanolamine (d18:1(4E))	CHEBI:73203	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Sphingomyelin (d18:0)	CHEBI:67090	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Sphingomyelin (d18:1(4E))	CHEBI:17636	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Galactosyl ceramide (d18:0)	CHEBI:82920	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Galactosyl ceramide (d18:1(4E))	CHEBI:18390	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Glucosyl ceramide (d18:0)	CHEBI:82919	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Glucosyl ceramide (d18:1(4E))	CHEBI:22801	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Lactosyl ceramide (d18:0)	CHEBI:82926	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Lactosyl ceramide (d18:1(4E))	CHEBI:17950	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Sulfogalactosyl ceramide (d18:1(4E))	CHEBI:75956	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Sulfolactosyl ceramide (d18:1(4E))	CHEBI:78426	NA	NA	NA	NA	NA	SPHINGO_23	Sphinganine/Sphing-4E-enine	NA	NA	NA
+Glycosphingolipids ?filter only (d18:1(4E))	CHEBI:24402	NA	NA	NA	NA	NA	SPHINGO_23	Sphing-4E-enine	NA	NA	NA
+Cholesterol ester	CHEBI:17002	NA	NA	NA	NA	NA	NA	NA	NA	NA	FAS_85
+Cholesterol	CHEBI:16113	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA
+Fatty acids	CHEBI:28868	NA	NA	NA	NA	NA	NA	NA	FAS_85	NA	NA
+Fatty acyl-CoAs	CHEBI:58342	NA	NA	NA	NA	NA	NA	NA	FAS_85	NA	NA
+"N,O-diacylethanolamines"	CHEBI:84481	NA	NA	NA	NA	NA	FAS_15	NA	NA	NA	FAS_85
+N-acylethanolamines	CHEBI:52640	NA	NA	NA	NA	NA	FAS_85	NA	NA	NA	NA
+Fatty acyl-carnitines	CHEBI:75659	NA	NA	NA	NA	NA	FAS_85	NA	NA	NA	NA
+Wax esters	CHEBI:10036	FAS_79	FOH_15	NA	NA	NA	NA	NA	NA	NA	NA
+Fatty alcohols	CHEBI:24026	NA	NA	NA	NA	NA	NA	NA	NA	FOH_15	NA
+all-trans-retinyl ester	CHEBI:63410	NA	NA	NA	NA	NA	NA	NA	NA	NA	FAS_85
+1-acyl-N-(acetyl)-sphing-4-enine	CHEBI:84483	NA	NA	NA	NA	NA	NA	NA	NA	NA	FAS_85

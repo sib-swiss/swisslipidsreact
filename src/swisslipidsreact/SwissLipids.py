@@ -66,6 +66,10 @@ class SwissLipids():
         # Apply __clean_components function
         self.swisslipids['Components*'] = self.swisslipids.apply(__clean_components, axis=1)
 
+        # build_df_slm_class2iso needs df_isomeric_subspecies and the graph.
+        self.build_df_isomeric_subspecies()
+        self.get_lipid_class_graph()
+
         # Assign free fatty acid as component for all FA and FA-CoA
         FA = "SLM:000000984"
         F_alcohol = "SLM:000390053"
@@ -89,25 +93,25 @@ class SwissLipids():
         # Now load the files:
         df_facoa_to_ffa = __load_package_tsv(
             "swisslipidsreact.package_data.components_correction", 
-            "free fatty acids per compound.tsv"
+            "free_fatty_acids_per_compound.tsv"
         )
         comp_to_ffa_dict = dict(zip(df_facoa_to_ffa['Lipid ID'], df_facoa_to_ffa['free fatty acid']))
 
         df_comp_to_nacyl_dict = __load_package_tsv(
             "swisslipidsreact.package_data.components_correction",
-            "nacyls per compound.tsv"
+            "nacyls_per_compound.tsv"
         )
         comp_to_nacyl_dict = dict(zip(df_comp_to_nacyl_dict['Lipid ID'], df_comp_to_nacyl_dict['n-acyl']))
 
         df_comp_to_sn1_dict = __load_package_tsv(
             "swisslipidsreact.package_data.components_correction",
-            "sn1 per compound.tsv"
+            "sn1_per_compound.tsv"
         )
         comp_to_sn1_dict = dict(zip(df_comp_to_sn1_dict['Lipid ID'], df_comp_to_sn1_dict['sn1']))
 
         df_comp_to_sn2_dict = __load_package_tsv(
             "swisslipidsreact.package_data.components_correction",
-            "sn2 per compound.tsv"
+            "sn2_per_compound.tsv"
         )
         comp_to_sn2_dict = dict(zip(df_comp_to_sn2_dict['Lipid ID'], df_comp_to_sn2_dict['sn2']))
         
@@ -267,7 +271,7 @@ class SwissLipids():
             logger.info( "Reading pre-processed SwissLipids file with components in positions" )
             self.swisslipids = pd.read_csv(lipids_components_split_cache_file, sep='\t', low_memory=False)
         
-        # Build a dataframe with only isomeric subspecies.
+        # This is already done in pre_process_swisslipids, but when we read the cached file, we have to do it here.
         self.build_df_isomeric_subspecies()
         self.get_lipid_class_graph()
     
@@ -286,6 +290,36 @@ class SwissLipids():
         self.G_lipid_class = nx.from_pandas_edgelist(
             df_expanded, source='Lipid class*', target='Lipid ID', create_using=nx.DiGraph()
         )
+
+    def build_df_isomeric_subspecies(self):
+        """
+        Builds self.df_isomeric_subspecies
+        """
+        isomeric_subspecies = self.swisslipids[self.swisslipids['Level'] == 'Isomeric subspecies']
+        self.df_isomeric_subspecies = isomeric_subspecies.copy()
+        logger.info( "LENGTH: %8d df_isomeric_subspecies", len(self.df_isomeric_subspecies) )
+        if DEBUG > 1:
+            logger.debug( "FORMAT: df_isomeric_subspecies\n%s", debug_df_first_row(self.df_isomeric_subspecies) )
+            self.df_isomeric_subspecies.to_csv(os.path.join(self.output_dir, 'DEBUG_df_isomeric_subspecies.tsv'), sep="\t", header=True, index=False)
+
+    def build_df_slm_class2iso(self, class_SLMs):
+
+        # Find the descendants of each provided class SLM.
+        list_id_descendant = []
+        for slm_id in set(class_SLMs):
+            descendants = nx.descendants(self.G_lipid_class, slm_id)
+            list_id_descendant.extend((slm_id, i) for i in descendants)
+
+        # Create dataframe of class to isomeric subspecies relationships.
+        df_slm_class2iso = pd.DataFrame(list_id_descendant, columns=[
+            'class_slm_id', 'iso_slm_id'
+        ])
+
+        df_slm_class2iso = df_slm_class2iso.merge(
+            self.df_isomeric_subspecies, left_on='iso_slm_id',
+            right_on='Lipid ID', how='inner'
+        )
+        return df_slm_class2iso
 
     def build_and_filter_df_slm_class2iso(self, SLMs, filter_fa, stats=None, test=False):
 
@@ -392,7 +426,7 @@ class SwissLipids():
         }
 
         # Load FA mapping table
-        with importlib.resources.files("swisslipidsreact.package_data").joinpath("FA per class per position.tsv").open("r") as f:
+        with importlib.resources.files("swisslipidsreact.package_data").joinpath("FA_per_class_per_position.tsv").open("r") as f:
             df = pd.read_csv(f, sep="\t")
 
         # Use only palmitic acid in test mode.
@@ -480,26 +514,6 @@ class SwissLipids():
 
         return df_iso_curated_parent, iso_curated
     
-    # ---------- Lipid Class Graph Analysis ----------
-    def build_df_slm_class2iso(self, class_SLMs):
-
-        # Find the descendants of each provided class SLM.
-        list_id_descendant = []
-        for slm_id in set(class_SLMs):
-            descendants = nx.descendants(self.G_lipid_class, slm_id)
-            list_id_descendant.extend((slm_id, i) for i in descendants)
-
-        # Create dataframe of class to isomeric subspecies relationships.
-        df_slm_class2iso = pd.DataFrame(list_id_descendant, columns=[
-            'class_slm_id', 'iso_slm_id'
-        ])
-
-        df_slm_class2iso = df_slm_class2iso.merge(
-            self.df_isomeric_subspecies, left_on='iso_slm_id',
-            right_on='Lipid ID', how='inner'
-        )
-        return df_slm_class2iso
-    
     def build_df_slm2chebi(self):
         """
         Builds a map of SLM IDs to numeric ChEBI IDs.
@@ -539,15 +553,3 @@ class SwissLipids():
         # NB: 'unique()' returns a NumPy array, which has no 'merge()' function.
         # Use 'drop_duplicates()' to return a pandas Series, and convert it to a DataFrame.
         return df_expanded['Lipid class*'].dropna().drop_duplicates().to_frame()
-
-
-    def build_df_isomeric_subspecies(self):
-        """
-        Builds self.df_isomeric_subspecies
-        """
-        isomeric_subspecies = self.swisslipids[self.swisslipids['Level'] == 'Isomeric subspecies']
-        self.df_isomeric_subspecies = isomeric_subspecies.copy()
-        logger.info( "LENGTH: %8d df_isomeric_subspecies", len(self.df_isomeric_subspecies) )
-        if DEBUG > 1:
-            logger.debug( "FORMAT: df_isomeric_subspecies\n%s", debug_df_first_row(self.df_isomeric_subspecies) )
-            self.df_isomeric_subspecies.to_csv(os.path.join(self.output_dir, 'DEBUG_df_isomeric_subspecies.tsv'), sep="\t", header=True, index=False)
