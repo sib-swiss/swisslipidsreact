@@ -41,9 +41,6 @@ swisslipidsreact run
 
 # Convert TSV to RDF format for integration into the RDF knowledge graph.
 swisslipidsreact export-ttl
-
-# Analyse Rhea reaction template usage.
-swisslipidsreact master-id-analysis
 ```
 
 ## Options
@@ -122,11 +119,6 @@ To learn more about the options, check `swisslipidsreact --help`.
 * Export RDF for curated fatty acids (execution time: several hours):
   ```bash
   swisslipidsreact export-ttl --curated-fa --output-dir results-prod-curated
-  ```
-
-* Analyse the Rhea reaction master ID usage:
-  ```bash
-  swisslipidsreact master-id-analysis --input "results_merged/merged_enumerated_reactions.tsv" --filter-fa curated
   ```
 
 ## Debugging

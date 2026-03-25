@@ -5,7 +5,6 @@ import argparse
 from .utils import DEBUG
 from .main import run_pipeline
 from .ttl_export import export_ttl
-from .MasterIdAnalysis import MasterIdAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -90,44 +89,6 @@ def main():
         help = "RDF output format for exporting (nt, ttl etc.)"
     )
 
-    # Master ID analysis
-    parser_master_id_analysis = subparsers.add_parser("master-id-analysis", help = "Master ID analysis")
-    parser_master_id_analysis.add_argument(
-        "--input",
-        type = str,
-        default = None,
-        help = "Input TSV file (default: inferred from mode)"
-    )
-    parser_master_id_analysis.add_argument(
-        "--output-dir",
-        type = str,
-        default = None,
-        help = "Output directory (default: current working directory)"
-    )
-    parser_master_id_analysis.add_argument(
-        "--filter-fa",
-        type = str,
-        choices = ["curated", "c16", "none"],
-        default = "curated",
-        help = "Filter the fatty acids: curated (default), c16, none"
-    )
-    parser_master_id_analysis.add_argument(
-        "--filter-rhea",
-        action = "store_true",
-        help = "Filter Rhea by the SLM classes of the isomeric subspecies (default: False)"
-    )
-    parser_master_id_analysis.add_argument(
-        "--rhea-version",
-        type = int,
-        default = None,
-        help = "Use the given Rhea release version (default: latest release)"
-    )
-    parser_master_id_analysis.add_argument(
-        "--test",
-        action = "store_true",
-        help = "Test run with palmitic acid only (default: False)"
-    )
-    
     args = parser.parse_args()
 
     if args.command == "run":
@@ -145,17 +106,4 @@ def main():
             input_path = args.input,
             output_dir = args.output_dir,
             output_format = args.output_format
-        )
-
-    elif args.command == "master-id-analysis":
-        analysis = MasterIdAnalysis(
-            output_dir = args.output_dir
-        )
-        analysis.run_master_id_analysis(
-            results_overview_path = args.input,
-            output_dir = args.output_dir,
-            filter_fa = args.filter_fa,
-            filter_rhea = args.filter_rhea,
-            rhea_version = args.rhea_version,
-            test = args.test
         )
