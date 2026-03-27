@@ -57,38 +57,38 @@ class RheaToSwisslipidsDf():
         self.df_rhea2participants2slm = df_rhea2participants.merge(df_slm2chebi, on='chebi_id', how='inner')
 
     # --- Merge to obtain Rhea reactions of isomeric subspecies ---
-    def build_df_rhea2participants2slm_class2iso(self, df_rhea_slm_class2iso, df_swisslipids):
+    def build_df_rhea2participants2slm_parent2iso(self, df_rhea_slm_parent2iso, df_swisslipids):
 
-        # FORMAT: df_rhea_slm_class2iso = same as in main.py
-        logger.info( "LENGTH: %8d df_rhea_slm_class2iso", len(df_rhea_slm_class2iso) )
+        # FORMAT: df_rhea_slm_parent2iso = same as in main.py
+        logger.info( "LENGTH: %8d df_rhea_slm_parent2iso", len(df_rhea_slm_parent2iso) )
         logger.info( "LENGTH: %8d df_swisslipids", len(df_swisslipids) )
         logger.debug( "FORMAT: df_swisslipids\n%s", debug_df_first_row(df_swisslipids) )
 
-        logger.debug( "LEFT merging self.df_rhea2participants2slm WITH df_rhea_slm_class2iso ON 'Lipid ID' = 'class_slm_id'" )
-        df_rhea2participants2slm_class2iso = self.df_rhea2participants2slm.merge(
-            df_rhea_slm_class2iso, left_on='Lipid ID', right_on='class_slm_id', how='left'
+        logger.debug( "LEFT merging self.df_rhea2participants2slm WITH df_rhea_slm_parent2iso ON 'slm_id' = 'parent_slm_id'" )
+        df_rhea2participants2slm_parent2iso = self.df_rhea2participants2slm.merge(
+            df_rhea_slm_parent2iso, left_on='slm_id', right_on='parent_slm_id', how='left'
         )
-        logger.info( "LENGTH: %8d df_rhea2participants2slm_class2iso", len(df_rhea2participants2slm_class2iso) )
-        logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
+        logger.info( "LENGTH: %8d df_rhea2participants2slm_parent2iso", len(df_rhea2participants2slm_parent2iso) )
+        logger.debug( "FORMAT: df_rhea2participants2slm_parent2iso\n%s", debug_df_first_row(df_rhea2participants2slm_parent2iso) )
 
-        logger.debug( "Selecting a subset of columns of df_rhea2participants2slm_class2iso and renaming some" )
-        df_rhea2participants2slm_class2iso = df_rhea2participants2slm_class2iso[[
-            'MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'class_slm_id', 'iso_slm_id', 'smiles', 'Name'
-        ]].rename(columns={'Name': 'iso_slm_name'})
-        logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
+        logger.debug( "Selecting a subset of columns of df_rhea2participants2slm_parent2iso" )
+        df_rhea2participants2slm_parent2iso = df_rhea2participants2slm_parent2iso[[
+            'MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'parent_slm_id', 'iso_slm_id', 'iso_slm_name', 'smiles'
+        ]]
+        logger.debug( "FORMAT: df_rhea2participants2slm_parent2iso\n%s", debug_df_first_row(df_rhea2participants2slm_parent2iso) )
 
-        logger.debug( "LEFT merging df_rhea2participants2slm_class2iso WITH df_swisslipids ON 'iso_slm_id' = 'Lipid ID'" )
-        df_rhea2participants2slm_class2iso = df_rhea2participants2slm_class2iso.merge(
+        logger.debug( "LEFT merging df_rhea2participants2slm_parent2iso WITH df_swisslipids ON 'iso_slm_id' = 'Lipid ID'" )
+        df_rhea2participants2slm_parent2iso = df_rhea2participants2slm_parent2iso.merge(
             df_swisslipids, left_on='iso_slm_id', right_on='Lipid ID', how='left'
         )
-        logger.info( "LENGTH: %8d df_rhea2participants2slm_class2iso", len(df_rhea2participants2slm_class2iso) )
-        logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
+        logger.info( "LENGTH: %8d df_rhea2participants2slm_parent2iso", len(df_rhea2participants2slm_parent2iso) )
+        logger.debug( "FORMAT: df_rhea2participants2slm_parent2iso\n%s", debug_df_first_row(df_rhea2participants2slm_parent2iso) )
         
-        logger.debug( "Dropping 3 columns of df_rhea2participants2slm_class2iso: 'Lipid ID', 'Level', 'Lipid class*'" )
-        df_rhea2participants2slm_class2iso.drop(columns=['Lipid ID', 'Level', 'Lipid class*'], inplace=True)
-        logger.debug( "FORMAT: df_rhea2participants2slm_class2iso\n%s", debug_df_first_row(df_rhea2participants2slm_class2iso) )
+        logger.debug( "Dropping 3 columns of df_rhea2participants2slm_parent2iso: 'Lipid ID', 'Level', 'Lipid class*'" )
+        df_rhea2participants2slm_parent2iso.drop(columns=['Lipid ID', 'Level', 'Lipid class*'], inplace=True)
+        logger.debug( "FORMAT: df_rhea2participants2slm_parent2iso\n%s", debug_df_first_row(df_rhea2participants2slm_parent2iso) )
 
-        self.df_rhea2participants2slm_class2iso = df_rhea2participants2slm_class2iso
+        self.df_rhea2participants2slm_parent2iso = df_rhea2participants2slm_parent2iso
  
 
     # --- Reaction generation functions ---
@@ -449,19 +449,19 @@ class RheaToSwisslipidsDf():
 
         # --- Main section ---
 
-        # self.df_rhea2participants2slm_class2iso contains only Rhea
+        # self.df_rhea2participants2slm_parent2iso contains only Rhea
         # participants that map to an SLM. Before we can enumerate reactions, we
         # have to add back the Rhea participants that do not map to an SLM.
-        df = self.df_rhea2participants2slm_class2iso
+        df = self.df_rhea2participants2slm_parent2iso
         logger.info( "LENGTH: %8d df_rhea2participants", len(df_rhea2participants) )
-        logger.info( "LENGTH: %8d df = self.df_rhea2participants2slm_class2iso", len(df) )
+        logger.info( "LENGTH: %8d df = self.df_rhea2participants2slm_parent2iso", len(df) )
         logger.debug( "FORMAT: df\n%s", debug_df_first_row(df) )
         if DEBUG > 1:
             df.to_csv(os.path.join(self.output_dir, 'DEBUG_df.tsv'), sep="\t", header=True, index=False)
         
         # Get subset of df_rhea2participants columns.
         df_rhea2participants_subset = df_rhea2participants[['MASTER_ID', 'reaction_side', 'chebi_id', 'stoich_coef', 'smiles']]
-        # Get subset of df_rhea2participants rows whose MASTER_ID is in df (= r2sl.df_rhea2participants2slm_class2iso).
+        # Get subset of df_rhea2participants rows whose MASTER_ID is in df (= r2sl.df_rhea2participants2slm_parent2iso).
         df_rhea2participants_subset = df_rhea2participants_subset[df_rhea2participants_subset['MASTER_ID'].isin(df['MASTER_ID'])]
         logger.info( "LENGTH: %8d df_rhea2participants_subset", len(df_rhea2participants_subset) )
         logger.debug( "FORMAT: df_rhea2participants_subset\n%s", debug_df_first_row(df_rhea2participants_subset) )
