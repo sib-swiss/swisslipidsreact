@@ -8,12 +8,12 @@ from datetime import datetime
 
 from pyrheadb.RheaDB import RheaDB
 
-from .utils import DEBUG, debug_df_first_row
+from .utils import *
 from .SwissLipids import SwissLipids
 from .RheaToSwisslipidsDf import RheaToSwisslipidsDf
 
 logger = logging.getLogger(__name__)
-
+    
 def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_id=None, rhea_version=None, test=False):
 
     # determine the base directory
@@ -24,42 +24,15 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
 
     # generate a timestamped filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    f_results_statistics = f'{timestamp}_results_statistics.tsv'
-    stats = {
-        "rhea": [], # unique Rhea IDs
-        "reactions": [], # enumerated reactions
-        "participants": [],
-        "lipids": []
-    }
     
     # ---------- Load and Process RheaDB Data ----------
 
     # Read SwissLipids files.
     sl = SwissLipids(output_dir=output_dir, timestamp=timestamp)
     sl.read_swisslipids_from_file(filter_fa, test)
-
     # df_slm2chebi maps an SLM ID to a CHEBI ID:
     # slm_id | chebi_id
     df_slm2chebi = sl.build_df_slm2chebi()
-    stats["lipids"].append( "%8d SwissLipids SLM IDs with a ChEBI ID (df_slm2chebi)\n" % len(df_slm2chebi) )
-    if DEBUG > 1:
-        logger.debug( "FORMAT: df_slm2chebi\n%s", debug_df_first_row(df_slm2chebi) )
-        df_slm2chebi.to_csv(os.path.join(output_dir, 'DEBUG_df_slm2chebi.tsv'), sep="\t", header=True, index=False)
-
-    # Get the unique SLM parent classes of all isomeric subspecies:
-    # NB: 'unique()' returns a NumPy array, which has no 'merge()' function.
-    # Use 'drop_duplicates()' to return a pandas Series, and convert it to a DataFrame.
-    df_iso_parent = sl.df_slm_parent2iso['parent_slm_id'].dropna().drop_duplicates().to_frame()
-    stats["lipids"].append( "%8d SwissLipids parent class SLM IDs of isomeric subspecies (df_iso_parent)\n" % len(df_iso_parent) )
-    # - Get the ChEBI ID for each SLM ID.
-    df_iso_parent2chebi = df_iso_parent.merge(df_slm2chebi, left_on='parent_slm_id', right_on='slm_id', how='inner')
-    df_iso_parent2chebi = df_iso_parent2chebi[["slm_id", "chebi_id"]]
-    stats["lipids"].append( "%8d SwissLipids parent class ChEBI IDs of isomeric subspecies (df_iso_parent2chebi)\n" % len(df_iso_parent2chebi) )
-    if DEBUG > 1:
-        logger.debug( "FORMAT: df_iso_parent2chebi\n%s", debug_df_first_row(df_iso_parent2chebi) )
-        df_iso_parent2chebi.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_parent2chebi.tsv'), sep="\t", header=True, index=False)
-    # - Get the list of ChEBIs.
-    l_iso_parent_chebi = df_iso_parent2chebi['chebi_id'].tolist()
     
     # Read the Rhea FTP files.
     rdb = RheaDB(rhea_version=rhea_version)
@@ -69,18 +42,16 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     # df_rhea has one line per Rhea forward reaction:
     # MASTER_ID | reaction_participant_names | rheaid | rxnsmiles_no_residue_correction | chebi_equation | residue_rxn_flag | rxnsmiles | rxn_smiles_halogen | rxn_smiles_no_A_AH | class_reaction_flag | polymer_reaction_flag | RInChI | Web-RInChIKey
     df_rhea = rdb.df_reactions
-    stats["rhea"].append( "%8d Rhea IDs (unfiltered)\n" % len(df_rhea) )
+    add_statistics(logger, "rhea", "%8d Rhea IDs (unfiltered)\n" % len(df_rhea))
     if DEBUG > 1:
-        logger.debug( "FORMAT: df_rhea\n%s", debug_df_first_row(df_rhea) )
         df_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea.tsv'), sep="\t", header=True, index=False)
     
     # df_rhea2participants has one line per Rhea participant:
     # MASTER_ID | reaction_side | chebiid | smiles | inchi | inchikey | inchikey14L | stoich_coef
     # NB: 'chebiid' also contains POLYMER:x, but for GENERICs it contains the residues' CHEBI IDs.
     df_rhea2participants = rdb.rhea_reaction_long_format_smiles_chebi
-    stats["participants"].append( "%8d Rhea participants (unfiltered)\n" % len(df_rhea2participants) )
+    add_statistics(logger, "participants", "%8d Rhea participants (unfiltered)\n" % len(df_rhea2participants))
     if DEBUG > 1:
-        logger.debug( "FORMAT: df_rhea2participants\n%s", debug_df_first_row(df_rhea2participants) )
         df_rhea2participants.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea2participants.tsv'), sep="\t", header=True, index=False)
     if rhea_id:
         df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'] == rhea_id]
@@ -89,13 +60,13 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     # 1. Remove reactions with Web-RInChIKey.
     df_rhea_without_rinchikey = df_rhea[df_rhea['Web-RInChIKey'].isna()]
     df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'].isin(df_rhea_without_rinchikey['MASTER_ID'])]
-    stats["participants"].append( "%8d Rhea participants (after filtering by Web-RInChIKey)\n" % len(df_rhea2participants) )
-    stats["rhea"].append( "%8d Rhea IDs (after filtering by Web-RInChIKey)\n" % len(df_rhea2participants['MASTER_ID'].unique()) )
+    add_statistics(logger, "participants", "%8d Rhea participants (after filtering by Web-RInChIKey)\n" % len(df_rhea2participants))
+    add_statistics(logger, "rhea", "%8d Rhea IDs (after filtering by Web-RInChIKey)\n" % len(df_rhea2participants['MASTER_ID'].unique()))
     # 2. Remove reactions with Rhea generic compounds
     df_rhea_without_generics  = df_rhea[df_rhea['residue_rxn_flag'] == False]
     df_rhea2participants = df_rhea2participants[df_rhea2participants['MASTER_ID'].isin(df_rhea_without_generics['MASTER_ID'])]
-    stats["participants"].append( "%8d Rhea participants (after filtering by generics)\n" % len(df_rhea2participants) )
-    stats["rhea"].append( "%8d Rhea IDs (after filtering by generics)\n" % len(df_rhea2participants['MASTER_ID'].unique()) )    
+    add_statistics(logger, "participants", "%8d Rhea participants (after filtering by generics)\n" % len(df_rhea2participants))
+    add_statistics(logger, "rhea", "%8d Rhea IDs (after filtering by generics)\n" % len(df_rhea2participants['MASTER_ID'].unique()))    
     
     #### SWISS LIPIDS CORRECTIONS ####
     # In swisslipids ChEBI:58342 corresponds to Fatty acyl-CoAs, however, in
@@ -149,29 +120,28 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     # Remove reactions with polymers.
     l_rhea_with_polymers = df_rhea2participants.loc[df_rhea2participants['id_prefix'] == 'POLYMER', 'MASTER_ID'].tolist()
     df_rhea2participants = df_rhea2participants[~df_rhea2participants['MASTER_ID'].isin(l_rhea_with_polymers)]
-    stats["participants"].append( "%8d Rhea participants (after filtering by polymers)\n" % len(df_rhea2participants) )
-    stats["rhea"].append( "%8d Rhea IDs (after filtering by polymers)\n" % len(df_rhea2participants['MASTER_ID'].unique()) )
+    add_statistics(logger, "participants", "%8d Rhea participants (after filtering by polymers)\n" % len(df_rhea2participants))
+    add_statistics(logger, "rhea", "%8d Rhea IDs (after filtering by polymers)\n" % len(df_rhea2participants['MASTER_ID'].unique()))
     
     # Class RheaToSwissLipids merges Rhea and SwissLipids data.
     r2sl = RheaToSwisslipidsDf(output_dir=output_dir, timestamp=timestamp)
     # df_rhea2participants2slm maps Rhea participants chebi_id to the corresponding slm_id:
     # MASTER_ID | reaction_side | chebiid | smiles | inchi | inchikey | inchikey14L | stoich_coef | id_prefix | chebi_id | slm_id | CHEBI
     r2sl.build_df_rhea2participants2slm(df_rhea2participants, df_slm2chebi)
-    stats["participants"].append( "%8d Rhea participants (after mapping participant ChEBI ID to SLM ID)\n" % len(r2sl.df_rhea2participants2slm) )
-    stats["rhea"].append( "%8d Rhea IDs (after mapping participant ChEBI ID to SLM ID)\n" % len(r2sl.df_rhea2participants2slm['MASTER_ID'].unique()) )
+    add_statistics(logger, "participants", "%8d Rhea participants (after mapping participant ChEBI ID to SLM ID)\n" % len(r2sl.df_rhea2participants2slm))
+    add_statistics(logger, "rhea", "%8d Rhea IDs (after mapping participant ChEBI ID to SLM ID)\n" % len(r2sl.df_rhea2participants2slm['MASTER_ID'].unique()))
     if DEBUG > 1:
-        logger.debug( "FORMAT: df_rhea2participants2slm\n%s", debug_df_first_row(r2sl.df_rhea2participants2slm) )
         r2sl.df_rhea2participants2slm.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea2participants2slm.tsv'), sep="\t", header=True, index=False)
 
     # Get the list of unique SwissLipids SLM IDs in Rhea.
     SLMs_in_rhea = r2sl.df_rhea2participants2slm['slm_id'].unique()
-    stats["lipids"].append( "%8d SwissLipids SLMs IDs in Rhea (all levels)\n" % len(SLMs_in_rhea) )
-    # Check which isomeric subspecies are not covered in Rhea:
-    # some are candidates for new reactions?
-    df_iso_parent_in_rhea     = df_iso_parent2chebi[df_iso_parent2chebi['slm_id'].isin(SLMs_in_rhea)][["slm_id", "chebi_id"]]
-    df_iso_parent_not_in_rhea = df_iso_parent2chebi[~df_iso_parent2chebi['slm_id'].isin(SLMs_in_rhea)][["slm_id", "chebi_id"]]
-    stats["lipids"].append( "%8d SwissLipids parent class SLMs IDs of isomeric subspecies in Rhea\n"     % len(df_iso_parent_in_rhea) )
-    stats["lipids"].append( "%8d SwissLipids parent class SLMs IDs of isomeric subspecies not in Rhea\n" % len(df_iso_parent_not_in_rhea) )
+    # Check which parent classes are not in Rhea: some are candidates for new reactions?
+    df_iso_parent_in_rhea     = (sl.df_slm_parent2iso[sl.df_slm_parent2iso['parent_slm_id'].isin(SLMs_in_rhea)]['parent_slm_id'].drop_duplicates())
+    df_iso_parent_not_in_rhea = (sl.df_slm_parent2iso[~sl.df_slm_parent2iso['parent_slm_id'].isin(SLMs_in_rhea)]['parent_slm_id'].drop_duplicates())
+    add_statistics(logger, "lipids", "-------- SwissLipids parent class SLMs IDs\n")
+    add_statistics(logger, "lipids", "%8d SwissLipids parent class SLMs IDs\n" % len(set(sl.df_slm_parent2iso['parent_slm_id'])))
+    add_statistics(logger, "lipids", "%8d SwissLipids parent class SLMs IDs in Rhea\n" % len(df_iso_parent_in_rhea))
+    add_statistics(logger, "lipids", "%8d SwissLipids parent class SLMs IDs not in Rhea\n" % len(df_iso_parent_not_in_rhea))
     if DEBUG > 1:
         df_iso_parent_in_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_parent_in_rhea.tsv'), sep="\t", header=True, index=False) 
         df_iso_parent_not_in_rhea.to_csv(os.path.join(output_dir, 'DEBUG_df_iso_parent_not_in_rhea.tsv'), sep="\t", header=True, index=False)
@@ -181,16 +151,16 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
     # - Option: EACH side has a participant that is a parent class SLMs IDs of isomeric subspecies.
     if filter_rhea == "two-sides":
         df = r2sl.df_rhea2participants2slm.copy()
-        # Extract L/R suffix from "reaction_side" column into new "side" column.
-        df["side"] = df["reaction_side"].str[-1]
+        # Extract L/R suffix from 'reaction_side' column into new 'side' column.
+        df['side'] = df['reaction_side'].str[-1]
         # Determine which rows match a class used in the enumeration.
-        df["match"] = df["chebi_id"].isin(l_iso_parent_chebi)
-        # Pivot the dataframe: group by "MASTER_ID", split by "side" values, aggregate "match" values (True/False)
+        df['match'] = df['slm_id'].isin(sl.df_slm_parent2iso['parent_slm_id'])
+        # Pivot the dataframe: group by 'MASTER_ID', split by 'side' values, aggregate 'match' values (True/False)
         # -> MASTER_ID | L | R
         # NB: df.pivot_table() is faster than df.apply() -> C‑optimized, no Python loops.
-        agg = df.pivot_table(index="MASTER_ID", columns="side", values="match", aggfunc="any", fill_value=False)
-        # Get the MASTER_IDs where both sides have at least one "match"=True.
-        l_rhea_used_in_enumeration = agg[(agg["L"]) & (agg["R"])].index
+        agg = df.pivot_table(index='MASTER_ID', columns='side', values='match', aggfunc='any', fill_value=False)
+        # Get the MASTER_IDs where both sides have at least one 'match'=True.
+        l_rhea_used_in_enumeration = agg[(agg['L']) & (agg['R'])].index
     # - Option: At least ONE side has a participant that is a parent class SLMs IDs of isomeric subspecies.
     else:
         l_rhea_used_in_enumeration = r2sl.df_rhea2participants2slm.loc[r2sl.df_rhea2participants2slm['slm_id'].isin(sl.df_slm_parent2iso['parent_slm_id']), 'MASTER_ID'].unique().tolist()
@@ -200,10 +170,12 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         df_rhea_not_used_in_enumeration.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_not_used_in_enumeration.tsv'), sep="\t", header=True, index=False)
     
     r2sl.df_rhea2participants2slm = r2sl.df_rhea2participants2slm[r2sl.df_rhea2participants2slm['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
-    stats["participants"].append( "%8d Rhea participants (after filtering by parent class SLM ID)\n" % len(r2sl.df_rhea2participants2slm) )
-    stats["rhea"].append( "%8d Rhea IDs (after filtering by parent class SLM ID)\n" % len(r2sl.df_rhea2participants2slm['MASTER_ID'].unique()) )
-    SLMs_in_rhea = r2sl.df_rhea2participants2slm['slm_id'].unique()
-    stats["lipids"].append( "%8d SwissLipids SLMs IDs in Rhea (all levels, after filter_rhea = %s)\n" % (len(SLMs_in_rhea), filter_rhea) )
+    add_statistics(logger, "participants", "%8d Rhea participants (after filtering by parent class SLM ID)\n" % len(r2sl.df_rhea2participants2slm))
+    add_statistics(logger, "rhea", "%8d Rhea IDs (after filtering by parent class SLM ID)\n" % len(r2sl.df_rhea2participants2slm['MASTER_ID'].unique()))
+    
+    #add_statistics(logger, "lipids", "%8d SwissLipids SLMs IDs in Rhea (all levels, before filter_rhea = %s)\n" % (len(SLMs_in_rhea), filter_rhea))
+    SLMs_in_rhea_filtered = r2sl.df_rhea2participants2slm['slm_id'].unique()
+    #add_statistics(logger, "lipids", "%8d SwissLipids SLMs IDs in Rhea (all levels, after filter_rhea = %s)\n" % (len(SLMs_in_rhea_filtered), filter_rhea))
     
     # Compute and cache the bond changes (we use them later to filter the enumeration results).
     # This takes app. 20min to compute, therefore we cache the result file in the rhea release folder.
@@ -228,59 +200,48 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         
     logger.info( "Reading %s", f_cache_rhea_bond_changes )
     df_rhea_bond_changes = pd.read_csv(f_cache_rhea_bond_changes, sep='\t')
-    logger.info( "LENGTH: %8d df_rhea_bond_changes", len(df_rhea_bond_changes) )
+    logger.info( "LENGTH: %8d df_rhea_bond_changes", len(df_rhea_bond_changes))
     dict_rhea2bond_changes = dict(zip(df_rhea_bond_changes['MASTER_ID'], df_rhea_bond_changes['bond_changes']))
 
     # Optionally, filter fatty acids.
     df_slm_parent2iso = sl.filter_df_slm_parent2iso(filter_fa, stats, test)
-    # df_rhea_slm_parent2iso is the subset of df_slm_parent2iso whose parent class is in Rhea.
-    # parent_slm_id | iso_slm_id | Level | Name | Components* | SMILES (pH7.3) | CHEBI | sn1' | sn2' | ....
-    df_rhea_slm_parent2iso = df_slm_parent2iso[df_slm_parent2iso['parent_slm_id'].isin(df_iso_parent_in_rhea['slm_id'].unique())]
-    
-    stats["lipids"].append( "-------- df_rhea_slm_parent2iso statistics (all parent class SLMs):\n" )
-    stats["lipids"].append( "%8d Rhea pairs of parent class/isomeric subspecies SLM IDs\n" % len(df_rhea_slm_parent2iso) )
-    stats["lipids"].append( "%8d Rhea parent class SLM IDs\n" % len(set(df_rhea_slm_parent2iso["parent_slm_id"])) )
-    stats["lipids"].append( "%8d Rhea isomeric subspecies SLM IDs\n" % len(set(df_rhea_slm_parent2iso["iso_slm_id"])) )
+
+    # This is df_rhea_slm_parent2iso without filters (just for printing statistics).
+    df_rhea_slm_parent2iso = sl.df_slm_parent2iso[sl.df_slm_parent2iso['parent_slm_id'].isin(SLMs_in_rhea)]
+    add_statistics(logger, "lipids", "-------- Rhea SLMs before filtering\n")
+    add_statistics(logger, "lipids", "%8d Rhea pairs of parent class/isomeric subspecies SLM IDs\n" % len(df_rhea_slm_parent2iso))
+    add_statistics(logger, "lipids", "%8d Rhea isomeric subspecies SLM IDs\n" % len(set(df_rhea_slm_parent2iso['iso_slm_id'])))
+    add_statistics(logger, "lipids", "%8d Rhea parent class SLM IDs\n" % len(set(df_rhea_slm_parent2iso['parent_slm_id'])))
+
+    # This is df_rhea_slm_parent2iso with filter_fa (for next step).
+    df_rhea_slm_parent2iso = df_slm_parent2iso[df_slm_parent2iso['parent_slm_id'].isin(SLMs_in_rhea)]
+    add_statistics(logger, "lipids", "-------- Rhea SLMs after filter_fa = %s\n" % filter_fa)
+    add_statistics(logger, "lipids", "%8d Rhea pairs of parent class/isomeric subspecies SLM IDs\n" % len(df_rhea_slm_parent2iso))
+    add_statistics(logger, "lipids", "%8d Rhea isomeric subspecies SLM IDs\n" % len(set(df_rhea_slm_parent2iso['iso_slm_id'])))
+    add_statistics(logger, "lipids", "%8d Rhea parent class SLM IDs\n" % len(set(df_rhea_slm_parent2iso['parent_slm_id'])))
     if DEBUG > 1:
         df_rhea_slm_parent2iso.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_slm_parent2iso.tsv'), sep="\t", header=True, index=False)
     
     # Map Rhea participants parent class to isomeric subspecies SLM IDs.
     r2sl.build_df_rhea2participants2slm_parent2iso(df_rhea_slm_parent2iso, sl.swisslipids)
-    
-    stats["participants"].append( "%8d Rhea participants (after mapping participant parent class SLM ID to isomeric subspecies SLM IDs)\n" % len(r2sl.df_rhea2participants2slm_parent2iso) )
-    stats["rhea"].append( "%8d Rhea IDs (after mapping participant parent class SLM ID to isomeric subspecies SLM IDs)\n" % len(r2sl.df_rhea2participants2slm_parent2iso['MASTER_ID'].unique()) )
-    stats["lipids"].append( "-------- r2sl.df_rhea2participants2slm_parent2iso statistics (parent class SLMs after filter_rhea = %s):\n" % filter_rhea )
+    add_statistics(logger, "participants", "%8d Rhea participants (after mapping participant parent class SLM ID to isomeric subspecies SLM IDs)\n" % len(r2sl.df_rhea2participants2slm_parent2iso))
+    add_statistics(logger, "rhea", "%8d Rhea IDs (after mapping participant parent class SLM ID to isomeric subspecies SLM IDs)\n" % len(r2sl.df_rhea2participants2slm_parent2iso['MASTER_ID'].unique()))
+
+    # This is df_rhea_slm_parent2iso with filter_fa and filer_rhea (just for printing statistics).
     # NB: There are 'nan' values after the LEFT merge, therfore use dropna() to exclude them from the stats.
     df_rhea_slm_parent2iso = (r2sl.df_rhea2participants2slm_parent2iso[['parent_slm_id', 'iso_slm_id']]
                               .dropna(subset=['parent_slm_id', 'iso_slm_id'])
                               .drop_duplicates()
     )
-    stats["lipids"].append( "%8d Rhea pairs of parent class/isomeric subspecies SLM IDs\n" % len(df_rhea_slm_parent2iso) )
-    stats["lipids"].append( "%8d Rhea parent class SLM IDs\n" % len(set(df_rhea_slm_parent2iso["parent_slm_id"])) )
-    stats["lipids"].append( "%8d Rhea isomeric subspecies SLM IDs\n" % len(set(df_rhea_slm_parent2iso["iso_slm_id"])) )
+    add_statistics(logger, "lipids", "-------- Rhea SLMs after filter_rhea = %s\n" % filter_rhea)
+    add_statistics(logger, "lipids", "%8d Rhea pairs of parent class/isomeric subspecies SLM IDs\n" % len(df_rhea_slm_parent2iso))
+    add_statistics(logger, "lipids", "%8d Rhea isomeric subspecies SLM IDs\n" % len(set(df_rhea_slm_parent2iso['iso_slm_id'])))
+    add_statistics(logger, "lipids", "%8d Rhea parent class SLM IDs\n" % len(set(df_rhea_slm_parent2iso['parent_slm_id'])))
     if DEBUG > 1:
         df_rhea_slm_parent2iso.to_csv(os.path.join(output_dir, 'DEBUG_df_rhea_slm_parent2iso-after-rhea-filter.tsv'), sep="\t", header=True, index=False)
         
-    # Function save_results generated the combinations and saves the results
-    r2sl.save_results(df_rhea2participants, f'{timestamp}_enumerated_reactions.tsv', dict_rhea2bond_changes, stats)
+    # Function save_results enumerates reactions and saves the results
+    r2sl.save_results(df_rhea2participants, "enumerated_reactions.tsv", dict_rhea2bond_changes, stats)
 
     # Save statistics to a tsv file.
-    with open(os.path.join(output_dir, f_results_statistics), 'w') as f:
-        
-        f.write("\n\nRhea ID statistics:\n\n")
-        for line in stats["rhea"]:
-            f.write(line)
-
-        f.write("\n\nRhea participants statistics:\n\n")
-        for line in stats["participants"]:
-            f.write(line)
-
-        f.write("\n\nSLM lipids statistics:\n\n")
-        for line in stats["lipids"]:
-            f.write(line)
-
-        f.write("\n\nEnumerated reactions statistics:\n\n")
-        for line in stats["reactions"]:
-            f.write(line)
-
-    logger.info( "Statistics saved to %s\n", f_results_statistics )
+    save_statistics(output_dir)

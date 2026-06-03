@@ -5,7 +5,7 @@ import networkx as nx
 import importlib.resources
 from platformdirs import user_cache_dir
 
-from .utils import DEBUG, debug_df_first_row
+from .utils import *
 from .FA_lists import positions, get_FA_list, FAS_15, FAS_85, FAS_79, FOH_15, PAL_C16, PALOH_C16, PAL_C16_OCT_C18, SPHINGO_23
 
 logger = logging.getLogger(__name__)
@@ -326,7 +326,6 @@ class SwissLipids():
         
         logger.info( "LENGTH: %8d df_slm_parent2iso", len(self.df_slm_parent2iso) )
         if DEBUG > 1:
-            logger.debug( "FORMAT: df_slm_parent2iso\n%s", debug_df_first_row(self.df_slm_parent2iso) )
             self.df_slm_parent2iso.to_csv(os.path.join(self.output_dir, 'DEBUG_df_slm_parent2iso.tsv'), sep="\t", header=True, index=False)
 
     def build_df_slm_class2iso(self, class_slm_ids):
@@ -358,28 +357,37 @@ class SwissLipids():
         df_slm_parent2iso = self.df_slm_parent2iso
         if DEBUG > 1:
             df_slm_parent2iso.to_csv(os.path.join(self.output_dir, 'DEBUG_df_slm_parent2iso_start.tsv'), sep="\t", header=True, index=False)
+
+        add_statistics(logger, "lipids", "-------- SwissLipids before filtering\n")
+        add_statistics(logger, "lipids", "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs\n" % len(df_slm_parent2iso) )
+        add_statistics(logger, "lipids", "%8d SwissLipids isomeric subspecies SLM IDs\n" % len(set(df_slm_parent2iso['iso_slm_id'])))
+        add_statistics(logger, "lipids", "%8d SwissLipids parent class SLM IDs\n" % len(set(df_slm_parent2iso['parent_slm_id'])))
         
         if filter_fa == "curated":
+            add_statistics(logger, "lipids", "-------- SwissLipids during filtering\n")
             # Build a dataframe of parent class/isomeric subspecies that match curated rules.
             df_curated_parent2iso, curated_iso = self.build_df_curated_slm_parent2iso(test=test)
-            stats["lipids"].append( "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs (curated / df_curated_parent2iso)\n" % len(df_curated_parent2iso) )
+            add_statistics(logger, "lipids", "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs (curated / df_curated_parent2iso)\n" % len(df_curated_parent2iso) )
             # Get all rows from df_slm_parent2iso whose isomeric subspecies matches those in df_curated_parent2iso.
             df_iso_curated = df_slm_parent2iso[df_slm_parent2iso['iso_slm_id'].isin(df_curated_parent2iso['iso_slm_id'])]
-            stats["lipids"].append( "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs (curated / df_iso_curated)\n" % len(df_iso_curated) )
+            add_statistics(logger, "lipids", "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs (curated / df_iso_curated)\n" % len(df_iso_curated) )
             # Get all rows from df_slm_parent2iso whose isomeric subspecies do not match those in df_curated_parent2iso.
             df_iso_uncurated = df_slm_parent2iso[~df_slm_parent2iso['iso_slm_id'].isin(curated_iso)]
-            stats["lipids"].append( "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs (uncurated / df_iso_uncurated)\n" % len(df_iso_uncurated) )
+            add_statistics(logger, "lipids", "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs (uncurated / df_iso_uncurated)\n" % len(df_iso_uncurated) )
             # Concatenate the 2 dataframes.
             df_slm_parent2iso = pd.concat([df_iso_curated, df_iso_uncurated])
-            stats["lipids"].append( "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs (curated and uncurated / df_slm_parent2iso)\n" % len(df_slm_parent2iso) )
         
         if filter_fa == "c16":
             df_slm_parent2iso = self.filter_fa_c16(df_slm_class2iso=df_slm_parent2iso, test=test)
-            stats["lipids"].append( "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs (c16-filtered / df_iso_uncurated)\n" % len(df_slm_parent2iso) )
 
         if DEBUG > 1:
             df_slm_parent2iso.to_csv(os.path.join(self.output_dir, 'DEBUG_df_slm_parent2iso_end.tsv'), sep="\t", header=True, index=False)
 
+        add_statistics(logger, "lipids", "-------- SwissLipids after filter_fa = %s\n" % filter_fa)
+        add_statistics(logger, "lipids", "%8d SwissLipids pairs of parent class/isomeric subspecies SLM IDs\n" % len(df_slm_parent2iso) )
+        add_statistics(logger, "lipids", "%8d SwissLipids isomeric subspecies SLM IDs\n" % len(set(df_slm_parent2iso['iso_slm_id'])))
+        add_statistics(logger, "lipids", "%8d SwissLipids parent class SLM IDs\n" % len(set(df_slm_parent2iso['parent_slm_id'])))
+        
         return df_slm_parent2iso
 
     def filter_fa_c16(self, df_slm_class2iso, test=False):
@@ -543,8 +551,8 @@ class SwissLipids():
         if DEBUG > 1:
             df_curated_class2iso.to_csv(os.path.join(self.output_dir, 'DEBUG_df_curated_class2iso.tsv'), sep="\t", header=True, index=False)
 
-        # Filter to retain only the direct parents.
-        df_curated_parent2iso = df_curated_class2iso[df_curated_class2iso['class_slm_id'].isin(self.df_slm_parent2iso['parent_slm_id'])]
+        # Filter to retain only direct parents (this should make no difference?).
+        df_curated_parent2iso = df_curated_class2iso[df_curated_class2iso['parent_slm_id'].isin(self.df_slm_parent2iso['parent_slm_id'])]
         if DEBUG > 1:
             df_curated_parent2iso.to_csv(os.path.join(self.output_dir, 'DEBUG_df_curated_parent2iso.tsv'), sep="\t", header=True, index=False)
 
@@ -571,6 +579,10 @@ class SwissLipids():
         # Bug in lipids.tsv: There is one row with CHEBI:82731 instead of 82731.
         df_slm2chebi['chebi_id'] = df_slm2chebi['CHEBI'].apply(lambda x: int(float(x.replace('CHEBI:', ''))) if isinstance(x, str) else int(x))
         self.df_slm2chebi = df_slm2chebi[['slm_id', 'chebi_id']]
+
+        if DEBUG > 1:
+            df_slm2chebi.to_csv(os.path.join(self.output_dir, 'DEBUG_df_slm2chebi.tsv'), sep="\t", header=True, index=False)
+        
         return df_slm2chebi
    
     def SLMs_from_CHEBIs(self, list_of_chebi_ids):
