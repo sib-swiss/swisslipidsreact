@@ -118,7 +118,7 @@ def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format=
             g.add((right_uri, RH.curatedOrder, Literal(2)))
 
             chebi_l, chebi_r = parse_equation_sides(row['chebi_equation'])
-            slm_l, slm_r = parse_equation_sides(row['swisslipids_equation'])
+            slm_l, slm_r = parse_equation_sides(row['slm_id_equation'])
             left_compounds = merge_compounds(slm_l, chebi_l)
             right_compounds = merge_compounds(slm_r, chebi_r)
 
