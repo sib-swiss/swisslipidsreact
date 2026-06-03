@@ -193,7 +193,7 @@ def run_pipeline(output_dir=None, filter_fa="curated", filter_rhea=False, rhea_i
         l_rhea_used_in_enumeration = agg[(agg["L"]) & (agg["R"])].index
     # - Option: At least ONE side has a participant that is a parent class SLMs IDs of isomeric subspecies.
     else:
-        l_rhea_used_in_enumeration = r2sl.df_rhea2participants2slm.loc[r2sl.df_rhea2participants2slm['chebi_id'].isin(l_iso_parent_chebi), 'MASTER_ID'].unique().tolist()
+        l_rhea_used_in_enumeration = r2sl.df_rhea2participants2slm.loc[r2sl.df_rhea2participants2slm['slm_id'].isin(sl.df_slm_parent2iso['parent_slm_id']), 'MASTER_ID'].unique().tolist()
         
     if DEBUG > 1:
         df_rhea_not_used_in_enumeration = df_rhea[~df_rhea['MASTER_ID'].isin(l_rhea_used_in_enumeration)]
