@@ -4,7 +4,7 @@ import argparse
 
 from .utils import DEBUG
 from .main import run_pipeline
-from .ttl_export import export_ttl
+from .build_rdf import build_rdf
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # default pipeline command
-    parser_run = subparsers.add_parser("run", help="Run the data processing pipeline")
+    parser_run = subparsers.add_parser("run", help = "Enumerate reactions")
     parser_run.add_argument(
         "--output-dir",
         type = str,
@@ -34,22 +34,22 @@ def main():
     parser_run.add_argument(
         "--filter-fa",
         type = str,
-        choices = ["curated", "c16", "none"],
-        default = "curated",
-        help = "Filter the fatty acids: curated (default), c16, none"
+        choices = ["c16", "curated", "none"],
+        default = "c16",
+        help = "Filter the fatty acids: c16 (default), curated, none (use only in combination with --rhea-id option)"
     )
     parser_run.add_argument(
         "--filter-rhea",
         type = str,
         choices = ["two-sides", "one-side"],
         default = "two-sides",
-        help = "Filter Rhea by having an SLM class of an isomeric subspecies on at least one or both sides of the reaction: two-sides (default), one-side"
+        help = "Filter Rhea by having a direct SLM parent class of an isomeric subspecies on at least one or both sides of the reaction: two-sides (default), one-side"
     )
     parser_run.add_argument(
         "--rhea-id",
         type = int,
         default = None,
-        help = "Run pipeline only for the given Rhea ID"
+        help = "Enumerate reactions only for the given Rhea ID"
     )
     parser_run.add_argument(
         "--rhea-version",
@@ -60,33 +60,28 @@ def main():
     parser_run.add_argument(
         "--test",
         action = "store_true",
-        help = "Test run with palmitic acid only (default: False)"
+        help = "Use only SwissLipids compounds whose FAs are all palmitate (default: False)"
     )
     
-    # RDF export command
-    parser_export = subparsers.add_parser("export-ttl", help = "Export RDF file from results")
-    parser_export.add_argument(
-        "--curated-fa",
-        action = "store_true",
-        help = "Use curated fatty acid list for TTL export (default: False for c16)"
-    )
-    parser_export.add_argument(
+    # RDF build command.
+    parser_build_rdf = subparsers.add_parser("build-rdf", help="Build RDF from reaction enumeration result file")
+    parser_build_rdf.add_argument(
         "--input",
         type = str,
         default = None,
-        help = "Input TSV file (default: inferred from mode)"
+        help = "Input TSV file (default: <output-dir>/enumerated_reactions.tsv)"
     )
-    parser_export.add_argument(
+    parser_build_rdf.add_argument(
         "--output-dir",
         type = str,
         default = None,
         help = "Output directory (default: current working directory)"
     )
-    parser_export.add_argument(
+    parser_build_rdf.add_argument(
         "--output-format",
         type = str,
-        default = "ttl",
-        help = "RDF output format for exporting (nt, ttl etc.)"
+        default = "nt",
+        help = "RDF serialization format (default: nt)"
     )
 
     args = parser.parse_args()
@@ -100,10 +95,9 @@ def main():
             rhea_version = args.rhea_version,
             test = args.test
         )
-    elif args.command == "export-ttl":
-        export_ttl(
-            full_scope = args.curated_fa,
-            input_path = args.input,
+    elif args.command == "build-rdf":
+        build_rdf(
+            input_file = args.input,
             output_dir = args.output_dir,
             output_format = args.output_format
         )

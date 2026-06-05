@@ -1,55 +1,40 @@
-def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format='nt'):
+def build_rdf(input_file=None, output_dir=None, output_format='nt'):
+    
+    import os
+    from pathlib import Path
     from rdflib import Graph, Namespace, RDF, RDFS, URIRef, Literal
     import pandas as pd
-    import os
-    from datetime import datetime
-    import glob
     
-    # determine default
-    if full_scope:
-        MNetIRI_literal = "SwissLipids ontology * Rhea for curated FA list"
-        MNetIRI_string = "lipid_curated_FA_list"
-    else:
-        MNetIRI_literal = "SwissLipids ontology * Rhea for C16"
-        MNetIRI_string = "lipid_C16"
+    MNetIRI_literal = "SwissLipids Reactions C16"
+    MNetIRI_string = "SlrC16"
     
-    # fallback input if none given
-    if input_path is None:
-        search_dir = output_dir if output_dir is not None else os.getcwd()
-        pattern = os.path.join(search_dir, "*_enumerated_reactions.tsv")
-        candidates = glob.glob(pattern)
-        if not candidates:
-            raise FileNotFoundError(
-                f"No enumerated_reactions TSV files found in {search_dir}. "
-                f"Please provide --input explicitly."
-            )
-        # sort candidates by modification time
-        candidates.sort(key=os.path.getmtime, reverse=True)
-        input_path = candidates[0]
-        print(f"Auto-detected latest enumerated reactions file: {input_path}")
-
-    # fallback output if none given
+    # Set output directory (default is current working directory).
     if output_dir is None:
         output_dir = os.getcwd()
     else:
         os.makedirs(output_dir, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.join(
-        output_dir,
-        f"reactions_{'curated_FA' if full_scope else 'PAL_C16'}_{timestamp}.{output_format}"
-    )
+    # Set input file (default is "enumerated_reactions.tsv" in output directory).
+    if input_file is None:
+        input_file = os.path.join(output_dir, "enumerated_reactions.tsv")
+        if not os.path.isfile(input_file) or not os.access(input_file, os.R_OK):
+            raise FileNotFoundError(
+                f"Default file {input_file} does not exist or is not readable. Please provide file with --input option."
+            )
+    # Set output file name to be the same as input file name, but with file extension for output format.
+    input_file_base_name = os.path.splitext(os.path.basename(input_file))[0]
+    output_file = os.path.join(output_dir, f"{input_file_base_name}.{output_format}")
 
-    # load dataframe
-    df = pd.read_csv(input_path, sep="\t")
+    # Load dataframe.
+    df = pd.read_csv(input_file, sep="\t")
     df.dropna(subset=['Web-RInChIKey'], inplace=True)
 
-    # namespaces
+    # Namespaces
     RH = Namespace("http://rdf.rhea-db.org/")
     SLM = Namespace("https://www.swisslipids.org/#/entity/SLM:")
     CHEBI = Namespace("http://purl.obolibrary.org/obo/CHEBI_")
-    ANASVES = Namespace("http://rdf.example.org/anasves/")
-    ANASVES_str = "http://rdf.example.org/anasves/"
+    SLR_purl = "https://purl.expasy.org/lipid/reaction#"
+    SLR = Namespace(SLR_purl)
     GO = Namespace("http://purl.obolibrary.org/obo/GO_")
 
     # RDF graph
@@ -59,9 +44,9 @@ def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format=
     g.bind("rh", RH)
     g.bind("chebi", CHEBI)
     g.bind("slm", SLM)
-    g.bind("anasves", ANASVES)
+    g.bind("slr", SLR)
 
-    MNetIRI = ANASVES[MNetIRI_string]
+    MNetIRI = SLR[MNetIRI_string]
     g.add((MNetIRI, RDFS.label, Literal(MNetIRI_literal)))
     accessions_ready = []
 
@@ -86,7 +71,7 @@ def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format=
                 continue
             part_uri = URIRef(f"{reaction_uri}_compound_{comp_id}")
             g.add((part_uri, RH.location, GO["0005575"]))
-            comp_uri = URIRef(f"{ANASVES_str}Compound_{comp_id}")
+            comp_uri = URIRef(f"{SLR_purl}Compound_{comp_id}")
             g.add((side_uri, RH[f"contains{stoich_coef}"], part_uri))
             g.add((RH[f"contains{stoich_coef}"], RH.coefficient, Literal(stoich_coef)))
             g.add((RH[f"contains{stoich_coef}"], RDFS.subPropertyOf, RH.contains))
@@ -103,14 +88,14 @@ def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format=
 
     for _, row in df.iterrows():
         accession = row['Web-RInChIKey'].replace("Web-RInChIKey=", "")
-        reaction_uri = f"{ANASVES_str}{accession.replace('-', '_')}"
+        reaction_uri = f"{SLR_purl}{accession.replace('-', '_')}"
         left_uri = URIRef(f"{reaction_uri}_L")
         right_uri = URIRef(f"{reaction_uri}_R")
         reaction_ref = URIRef(reaction_uri)
         g.add((reaction_ref, RDFS.subClassOf, RH[str(row['MASTER_ID'])]))
-        g.add((reaction_ref, ANASVES["generatedFrom"], RH[str(row['MASTER_ID'])]))
+        g.add((reaction_ref, SLR["generatedFrom"], RH[str(row['MASTER_ID'])]))
         if accession not in accessions_ready:
-            g.add((MNetIRI, ANASVES.reac, reaction_ref))
+            g.add((MNetIRI, SLR.reac, reaction_ref))
             g.add((reaction_ref, RH.accession, Literal(accession)))
             g.add((reaction_ref, RH.side, left_uri))
             g.add((reaction_ref, RH.side, right_uri))
@@ -127,5 +112,5 @@ def export_ttl(full_scope=True, input_path=None, output_dir=None, output_format=
 
             accessions_ready.append(accession)
 
-    print(f"Saving RDF with {len(g)} triples to: {output_file}")
+    print(f"Saving RDF with {len(g)} triples to {output_file}")
     g.serialize(destination=output_file, format=output_format, encoding='utf-8')

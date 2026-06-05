@@ -1,6 +1,6 @@
 # SwissLipidsReact
 
-Expands Rhea reaction patterns into complete lipid reactions, resolving structures and assigning RInChIs.
+Expands Rhea reaction patterns into complete lipid reactions, resolving structures and assigning Web-RInChIs.
 
 [![License](https://img.shields.io/github/license/sib-swiss/pyrheadb)](LICENSE)
 ![OS Linux](https://img.shields.io/badge/OS-Linux-green)
@@ -36,89 +36,84 @@ To avoid downloading and preprocessing the full Rhea reaction data for every pot
 ## Run
 
 ```bash
-# Run enumeration
+# Enumerate reactions.
 swisslipidsreact run
 
-# Convert TSV to RDF format for integration into the RDF knowledge graph.
-swisslipidsreact export-ttl
+# Build RDF from enumeration results for integration into the RDF knowledge graph.
+swisslipidsreact build-rdf
 ```
 
 ## Options
 
-Explanation of fatty acid options:
+Explanation of fatty acid (FA) options:
   
 Options | Meaning | Runtime | Usage |
 --- | --- | --- | --- |
--filter-fa curated --test | Filter SwissLipids based on allowed FA per position, with only palmitate allowed as a FA in any position | minutes | Testing with reduced dataset |
--filter-fa curated | Filter SwissLipids based on allowed FA per position | hours | Integration in RDF knowledge graph |
--filter-fa none | Use all of SwissLipids | ∞ | Not recommended (too slow), but can be used for an individual Rhea ID |
+-filter-fa c16 --test | Use only SwissLipids compounds whose FAs are all palmitate | minutes | Testing with reduced dataset |
+-filter-fa c16 | Use only SwissLipids compounds with maximum one FA that is not palmitate | hours | Integration in RDF knowledge graph |
+-filter-fa none | Use all SwissLipids compounds | ∞ | Not recommended (too slow), but can be used in combination with the --rhea-id option |
 
 *Reaction enumeration*
 
   ```bash
 "--output-dir",
-help="Output directory (default: current working directory)"
+help = "Output directory (default: current working directory)"
 
 "--filter-fa",
-help = "Filter the fatty acids: curated (default), c16, none"
+ help = "Filter the fatty acids: c16 (default), curated, none (use only in combination with --rhea-id option)"
 
 "--filter-rhea",
-help = "Filter Rhea by the SLM classes of the isomeric subspecies (default: False)"
+help = "Filter Rhea by having a direct SLM parent class of an isomeric subspecies on at least one or both sides of the reaction: two-sides (default), one-side"
 
 "--rhea-id",
-help="Run pipeline only for the given Rhea ID"
+help = "Enumerate reactions only for the given Rhea ID"
 
 "--rhea-version",
 help = "Use the given Rhea release version (default: latest release)"
 
 "--test",
-help = "Test run with palmitic acid only (default: False)"
+help = "Use only SwissLipids compounds whose FAs are all palmitate (default: False)"
 ```
 
-*RDF export*
+*RDF build*
 
 ```bash
-"--curated-fa",
-help="Use curated fatty acid list for TTL export (default: False for C16)"
-
 "--input",
-help="Input TSV file (default: inferred from mode)"
+ help = "Input TSV file (default: <output-dir>/enumerated_reactions.tsv)"
+ 
+"--output-dir",
+help = "Output directory (default: current working directory)"
+
+"--output-format",
+help = "RDF serialization format (default: nt)"
 ```
 
-## Usage
-
-By default, the pipeline will generate results for palmitate only.
-To generate results for the whole list of fatty acids in human and enumerated classes, use the `--curated-fa` option.
+## Usage examples
 
 To learn more about the options, check `swisslipidsreact --help`.
 
-* Enumerate with curated fatty acids (test set):
+* Enumerate with SwissLipids compounds whose FAs are all palmitate (test set):
   ```bash
-  swisslipidsreact run --filter-fa curated --output-dir results-test-curated --test
+  swisslipidsreact run --filter-fa c16 --output-dir results-test-c16 --test
   ```
 
-* Enumerate with curated fatty acids (execution time: several hours):
+* Enumerate with SwissLipids compounds with maximum one FA that is not palmitate (production set):
   ```bash
-  swisslipidsreact run --filter-fa curated --output-dir results-prod-curated
+  swisslipidsreact run --filter-fa c16 --output-dir results-prod-c16
   ```
 
-* Enumerate with all fatty acids (WARNING: execution time: ∞):
-  ```bash
-  swisslipidsreact run --filter-fa none --output-dir results-prod
-  ```
-
-* Enumerate with all fatty acids for one rhea ID:
+* Enumerate with all SwissLipids compounds for one rhea ID:
   ```bash
   swisslipidsreact run --filter-fa none --rhea-id 78071 --output-dir results-rhea-78071
   ```
 
-* Export RDF for curated fatty acids (test set):
+* Build RDF for test set:
   ```bash
-  swisslipidsreact export-ttl --output-dir results-test-curated
+  swisslipidsreact build-rdf --output-dir results-test-c16
   ```
-* Export RDF for curated fatty acids (execution time: several hours):
+* Build RDF for production set:
   ```bash
-  swisslipidsreact export-ttl --curated-fa --output-dir results-prod-curated
+  swisslipidsreact build-rdf --output-dir results-prod-c16
   ```
 
 ## Debugging
@@ -137,5 +132,5 @@ SLR_DEBUG=1 swisslipidsreact run --filter-fa curated --output-dir results-test-c
 
 ```bash
 pip install pyinstrument
-pyinstrument --from-path swisslipidsreact export-ttl -input ... --output-dir ...
+pyinstrument --from-path swisslipidsreact build-rdf -input ... --output-dir ...
 ```
