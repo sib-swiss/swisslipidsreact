@@ -1,6 +1,8 @@
 def build_rdf(input_file=None, output_dir=None, output_format='nt'):
     
     import os
+    import gzip
+    import shutil
     from pathlib import Path
     from rdflib import Graph, Namespace, RDF, RDFS, URIRef, Literal
     import pandas as pd
@@ -112,5 +114,11 @@ def build_rdf(input_file=None, output_dir=None, output_format='nt'):
 
             accessions_ready.append(accession)
 
-    print(f"Saving RDF with {len(g)} triples to {output_file}")
+    print(f"Saving RDF with {len(g)} triples to {output_file}.gz")
     g.serialize(destination=output_file, format=output_format, encoding='utf-8')
+
+    # Compress the output file.
+    with open(output_file, "rb") as f_in:
+        with gzip.open(output_file + ".gz", "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    os.remove(output_file)
