@@ -33,7 +33,7 @@ def build_rdf(input_file=None, output_dir=None, output_format='nt'):
 
     # Namespaces
     RH = Namespace("http://rdf.rhea-db.org/")
-    SLM = Namespace("https://www.swisslipids.org/#/entity/SLM:")
+    SLM = Namespace("https://swisslipids.org/rdf/SLM_")
     CHEBI = Namespace("http://purl.obolibrary.org/obo/CHEBI_")
     SLR_purl = "https://purl.expasy.org/lipid/reaction#"
     SLR = Namespace(SLR_purl)
