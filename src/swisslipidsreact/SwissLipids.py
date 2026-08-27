@@ -269,9 +269,10 @@ class SwissLipids():
         else:
             logger.info( "Reading pre-processed SwissLipids file with components in positions" )
             self.swisslipids = pd.read_csv(lipids_components_split_cache_file, sep='\t', low_memory=False)
-            # build_df_slm_class2iso needs the graph and df_slm_parent2iso.
-            self.get_lipid_class_graph()
-            self.build_df_slm_parent2iso()
+
+        # build_df_slm_class2iso needs the graph and df_slm_parent2iso.
+        self.get_lipid_class_graph()
+        self.build_df_slm_parent2iso()
 
     def get_lipid_class_graph(self):
         """
