@@ -59,58 +59,70 @@ def build_rdf(input_file=None, output_dir=None, output_format='nt'):
         parse_side = lambda s: [(int(x.split()[0]), x.split()[1]) for x in s.split(" + ")]
         return parse_side(left), parse_side(right)
 
-    def merge_compounds(primary, fallback):
+    # Maps participants from 'slm_id_equation' to participants from 'chebi_equation'.
+    # This is required to add a subClassOf <CHEBI> to <SLM> participants.
+    def map_participants(slm, chebi):
         result = []
-        for p, f in zip(primary, fallback):
-            stoich_coef = p[0] if p else f[0]
-            comp_id = p[1] if p and p[1] != "NA" else f[1]
-            result.append((stoich_coef, comp_id))
+        for s, c in zip(slm, chebi):
+            stoich_coef = s[0]
+            slm_id      = s[1]
+            chebi_id    = c[1]
+            result.append((stoich_coef, slm_id, chebi_id))
         return result
 
-    def add_compounds(side_uri, compounds, reaction_uri):
-        for stoich_coef, comp_id in compounds:
-            if comp_id == "NA":
-                continue
-            part_uri = URIRef(f"{reaction_uri}_compound_{comp_id}")
+    def add_participants(side_uri, compounds, reaction_uri):
+        
+        # NOTE: 'slm_id' is an ID from 'slm_id_equation', which may contain both
+        # SLM IDs and CHEBI IDs!
+        for stoich_coef, slm_id, chebi_id in compounds:
+            # 1. Add participant.
+            part_uri = URIRef(f"{reaction_uri}_compound_{slm_id}")
             g.add((part_uri, RH.location, GO["0005575"]))
-            comp_uri = URIRef(f"{SLR_purl}Compound_{comp_id}")
             g.add((side_uri, RH[f"contains{stoich_coef}"], part_uri))
             g.add((RH[f"contains{stoich_coef}"], RH.coefficient, Literal(stoich_coef)))
             g.add((RH[f"contains{stoich_coef}"], RDFS.subPropertyOf, RH.contains))
+
+            # 2. Add compound.
+            comp_uri = URIRef(f"{SLR_purl}Compound_{slm_id}")
             g.add((part_uri, RH.compound, comp_uri))
-            full_accession = comp_id if "SLM:" in comp_id else f"CHEBI:{comp_id}"
+            full_accession = slm_id if slm_id.startswith("SLM:") else f"CHEBI:{chebi_id}"
             if full_accession.startswith("SLM:"):
                 chem_iri = SLM[full_accession.replace("SLM:", "")]
             elif full_accession.startswith("CHEBI:"):
-                chem_iri = CHEBI[full_accession.replace("CHEBI:", "")]
+                chem_iri = CHEBI[chebi_id]
             else:
                 raise Exception("Unexpected chem name: " + full_accession)
             g.add((comp_uri, RH.accession, Literal(full_accession)))
             g.add((comp_uri, RH.chebi, chem_iri))
+            g.add((comp_uri, RDFS.subClassOf, CHEBI[chebi_id]))
 
     for _, row in df.iterrows():
+        
         accession = row['Web-RInChIKey'].replace("Web-RInChIKey=", "")
         reaction_uri = f"{SLR_purl}{accession.replace('-', '_')}"
-        left_uri = URIRef(f"{reaction_uri}_L")
-        right_uri = URIRef(f"{reaction_uri}_R")
+        uri_l = URIRef(f"{reaction_uri}_L")
+        uri_r = URIRef(f"{reaction_uri}_R")
         reaction_ref = URIRef(reaction_uri)
+        
         g.add((reaction_ref, RDFS.subClassOf, RH[str(row['MASTER_ID'])]))
         g.add((reaction_ref, SLR["generatedFrom"], RH[str(row['MASTER_ID'])]))
+        
         if accession not in accessions_ready:
             g.add((MNetIRI, SLR.reac, reaction_ref))
             g.add((reaction_ref, RH.accession, Literal(accession)))
-            g.add((reaction_ref, RH.side, left_uri))
-            g.add((reaction_ref, RH.side, right_uri))
-            g.add((left_uri, RH.curatedOrder, Literal(1)))
-            g.add((right_uri, RH.curatedOrder, Literal(2)))
+            g.add((reaction_ref, RH.side, uri_l))
+            g.add((reaction_ref, RH.side, uri_r))
+            g.add((uri_l, RH.curatedOrder, Literal(1)))
+            g.add((uri_r, RH.curatedOrder, Literal(2)))
 
+            slm_l, slm_r     = parse_equation_sides(row['slm_id_equation'])
             chebi_l, chebi_r = parse_equation_sides(row['chebi_equation'])
-            slm_l, slm_r = parse_equation_sides(row['slm_id_equation'])
-            left_compounds = merge_compounds(slm_l, chebi_l)
-            right_compounds = merge_compounds(slm_r, chebi_r)
 
-            add_compounds(left_uri, left_compounds, reaction_uri)
-            add_compounds(right_uri, right_compounds, reaction_uri)
+            participants_l = map_participants(slm_l, chebi_l)
+            participants_r = map_participants(slm_r, chebi_r)
+
+            add_participants(uri_l, participants_l, reaction_uri)
+            add_participants(uri_r, participants_r, reaction_uri)
 
             accessions_ready.append(accession)
 
