@@ -83,6 +83,18 @@ def main():
         default = "nt",
         help = "RDF serialization format (default: nt)"
     )
+    parser_build_rdf.add_argument(
+        "--graph-name",
+        type = str,
+        default = "Slr",
+        help = "Name of the graph - no blanks allowed (default: Slr)"
+    )
+    parser_build_rdf.add_argument(
+        "--graph-label",
+        type = str,
+        default = "SwissLipids Reactions",
+        help = "Short description of the graph (default: SwissLipids Reactions)"
+    )
 
     args = parser.parse_args()
 
@@ -99,5 +111,7 @@ def main():
         build_rdf(
             input_file = args.input,
             output_dir = args.output_dir,
-            output_format = args.output_format
+            output_format = args.output_format,
+            graph_name = args.graph_name,
+            graph_label = args.graph_label
         )

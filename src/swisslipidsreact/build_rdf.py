@@ -1,4 +1,4 @@
-def build_rdf(input_file=None, output_dir=None, output_format='nt'):
+def build_rdf(input_file=None, output_dir=None, output_format='nt', graph_name='Slr', graph_label='SwissLipids Reactions'):
     
     import os
     import gzip
@@ -6,9 +6,6 @@ def build_rdf(input_file=None, output_dir=None, output_format='nt'):
     from pathlib import Path
     from rdflib import Graph, Namespace, RDF, RDFS, URIRef, Literal
     import pandas as pd
-    
-    MNetIRI_literal = "SwissLipids Reactions C16"
-    MNetIRI_string = "SlrC16"
     
     # Set output directory (default is current working directory).
     if output_dir is None:
@@ -47,9 +44,10 @@ def build_rdf(input_file=None, output_dir=None, output_format='nt'):
     g.bind("chebi", CHEBI)
     g.bind("slm", SLM)
     g.bind("slr", SLR)
-
-    MNetIRI = SLR[MNetIRI_string]
-    g.add((MNetIRI, RDFS.label, Literal(MNetIRI_literal)))
+    
+    graph_name = '_'.join(graph_name.split()) # Replace whitespaces by '_'
+    MNetIRI = SLR[graph_name]
+    g.add((MNetIRI, RDFS.label, Literal(graph_label)))
     accessions_ready = []
 
     def parse_equation_sides(equation):
